@@ -20,6 +20,39 @@ import {
   X
 } from 'lucide-react';
 
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+
+type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
+type Element = 'fire' | 'water' | 'earth' | 'air' | 'light' | 'dark';
+
+interface CardBase {
+  id: string;
+  cardCode: string;
+  name: string;
+  description: string;
+  rarity: Rarity;
+  series: string;
+  seriesNumber: number;
+  totalInSeries: number;
+  powerLevel: number;
+  element: Element;
+  cardType: string;
+  discoveryHint?: string;
+  maxSupply?: number;
+}
+
+interface UserCard extends CardBase {
+  discoveredAt: string;
+  instanceNumber: number;
+  isFoil: boolean;
+  isFirstEdition: boolean;
+  isFavorite: boolean;
+}
+
+
+
 // Import components (these would be from the component file)
 // In production, use: import { DigitalCard, CardDiscoveryModal, ... } from '@/components/digital-cards';
 
@@ -27,7 +60,7 @@ import {
 // MOCK DATA FOR DEMO (Replace with actual hook in production)
 // ============================================================================
 
-const DEMO_USER_CARDS = [
+const DEMO_USER_CARDS: UserCard[] = [
   {
     id: '1',
     cardCode: 'FOUNDER_001',
@@ -66,7 +99,7 @@ const DEMO_USER_CARDS = [
   },
 ];
 
-const DEMO_ALL_CARDS = [
+const DEMO_ALL_CARDS: CardBase[] = [
   ...DEMO_USER_CARDS,
   {
     id: '3',
@@ -137,7 +170,7 @@ const ELEMENT_CONFIG = {
 
 export default function DigitalCardsPage() {
   const [selectedTab, setSelectedTab] = useState<'collection' | 'series' | 'stats'>('collection');
-  const [selectedCard, setSelectedCard] = useState<typeof DEMO_ALL_CARDS[0] | null>(null);
+  const [selectedCard, setSelectedCard] = useState<CardBase | null>(null);
   const [showHint, setShowHint] = useState(false);
   
   // In production, use the hook:
@@ -151,7 +184,7 @@ export default function DigitalCardsPage() {
     total: 90, // Total possible cards
     owned: userCards.length,
     percentage: Math.round((userCards.length / 90) * 100),
-    legendaryOwned: userCards.filter(c => c.rarity === 'legendary' || c.rarity === 'mythic').length,
+    legendaryOwned: userCards.filter(c => (c.rarity as Rarity) === 'legendary' || (c.rarity as Rarity) === 'mythic').length,
     longestStreak: 7,
     favoriteCount: userCards.filter(c => c.isFavorite).length,
   };
@@ -583,3 +616,4 @@ export default function DigitalCardsPage() {
     </div>
   );
 }
+
