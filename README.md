@@ -1,90 +1,44 @@
-# CardVerse - Premium Trading Card Collection Platform
+# CardVerse 🎴
 
-![CardVerse](https://img.shields.io/badge/CardVerse-Trading%20Cards-purple)
-![Next.js](https://img.shields.io/badge/Next.js-14-black)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
+> Premium Trading Card Collection Platform by CR AudioViz AI
 
-## 🎴 Overview
+## Features
 
-CardVerse is the ultimate trading card collection platform by CR AudioViz AI. Track, value, and manage your Pokémon, Magic: The Gathering, Yu-Gi-Oh!, and sports card collections with AI-powered tools.
+- **Multi-Platform Coverage**: Pokémon, MTG, Yu-Gi-Oh!, Sports Cards
+- **AI Card Scanner**: Photo recognition for instant card identification
+- **Real-Time Pricing**: TCGPlayer, eBay sold data integration
+- **Grading Tracker**: PSA, BGS, CGC management
+- **Portfolio Analytics**: ROI tracking and investment insights
+- **Javari AI**: Your personal card expert assistant
+- **Hidden Digital Cards**: Collectible rewards throughout the platform
+- **Club System**: Community building and engagement
+- **Card Academy**: Educational courses and trivia
+- **Museum**: Interactive card history experience
 
-## ✨ Features
+## Tech Stack
 
-### Collection Management
-- Multi-category support (Pokémon, MTG, Yu-Gi-Oh!, Sports Cards)
-- AI-powered card scanner
-- Real-time price tracking
-- Grading tracker (PSA, BGS, CGC)
-- Portfolio analytics with ROI tracking
+- **Framework**: Next.js 14 (App Router)
+- **Styling**: Tailwind CSS
+- **Database**: Supabase (PostgreSQL)
+- **Payments**: Stripe
+- **Authentication**: Supabase Auth
+- **Animations**: Framer Motion
 
-### Javari AI
-- Your personal card expert
-- Comprehensive knowledge base
-- Investment advice
-- Authentication tips
-- Card history and facts
-
-### Community
-- Club system (Braggers, Regional, Team fans, etc.)
-- Public/private collections
-- Trade matching
-- Discussion forums
-
-### Gamification
-- Trivia games with 500+ questions
-- Digital card rewards
-- Achievements and badges
-- XP and leveling system
-- Card Academy courses
-
-### Museum
-- Trading card history timeline
-- Famous cards database
-- TCG origins and milestones
-- Educational articles
-
-## 🚀 Tech Stack
-
-- **Framework:** Next.js 14
-- **Language:** TypeScript
-- **Styling:** Tailwind CSS
-- **Components:** shadcn/ui
-- **Animations:** Framer Motion
-- **Database:** Supabase
-- **AI:** OpenAI GPT-4
-- **Payments:** Stripe
-- **Hosting:** Vercel
-
-## 📦 Installation
+## Getting Started
 
 ```bash
-# Clone the repository
-git clone https://github.com/CR-AudioViz-AI/crav-cardverse.git
-
-# Install dependencies
 npm install
-
-# Set up environment variables
-cp .env.example .env.local
-
-# Run development server
 npm run dev
 ```
 
-## 🗄️ Database Setup
+## Environment Variables
 
-Run the SQL schema in your Supabase project:
+Copy `.env.example` to `.env.local` and fill in your values.
 
-```bash
-# In Supabase SQL Editor
-# Execute db/schema.sql
-```
+## Live URL
 
-## 📝 License
+[crav-cardverse.vercel.app](https://crav-cardverse.vercel.app)
 
-© 2025 CR AudioViz AI, LLC. All rights reserved.
+---
 
-## 🔗 Links
-
-- [CR AudioViz AI](https://craudiovizai.com)
-- [BarrelVerse](https://barrelverse.vercel.app)
+Built with ❤️ by CR AudioViz AI
