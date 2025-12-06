@@ -372,7 +372,6 @@ export default function DigitalCardsPage() {
                               </div>
                             )}
                             
-                            {/* Foil indicator */}
                             {'isFoil' in card && card.isFoil && (
                               <div className="absolute top-1 right-1">
                                 <Sparkles className="w-3 h-3 text-purple-400" />
@@ -390,7 +389,6 @@ export default function DigitalCardsPage() {
                             {card.series}
                           </p>
                           
-                          {/* Power Level */}
                           {isOwned && (
                             <div className="flex items-center gap-1 mt-1">
                               <TrendingUp className="w-3 h-3 text-yellow-400" />
@@ -599,7 +597,6 @@ export default function DigitalCardsPage() {
                     </div>
                   </div>
                   
-                  {/* Hint for locked cards */}
                   {!ownedCardCodes.has(selectedCard.cardCode) && selectedCard.discoveryHint && (
                     <div className="bg-purple-900/30 border border-purple-500/30 rounded-lg p-3">
                       <p className="text-purple-300 text-sm">
@@ -616,4 +613,5 @@ export default function DigitalCardsPage() {
     </div>
   );
 }
+
 
