@@ -1,0 +1,175 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 47% 6%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 8%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 8%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 263 70% 50%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 263 70% 50%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 263 70% 50%;
+    --radius: 0.75rem;
+    --font-display: 'Orbitron', 'Segoe UI', sans-serif;
+    --font-body: 'Inter', 'Segoe UI', sans-serif;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(222 47% 8%);
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(263 70% 50% / 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(263 70% 50% / 0.7);
+}
+
+/* Card rarity effects */
+.card-common {
+  --glow-color: rgba(156, 163, 175, 0.3);
+}
+
+.card-uncommon {
+  --glow-color: rgba(34, 197, 94, 0.4);
+}
+
+.card-rare {
+  --glow-color: rgba(59, 130, 246, 0.5);
+}
+
+.card-epic {
+  --glow-color: rgba(168, 85, 247, 0.6);
+}
+
+.card-legendary {
+  --glow-color: rgba(245, 158, 11, 0.7);
+  animation: rarity-glow 2s ease-in-out infinite;
+}
+
+.card-mythic {
+  --glow-color: rgba(239, 68, 68, 0.8);
+  animation: rarity-glow 1.5s ease-in-out infinite;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(168, 85, 247, 0.1));
+}
+
+/* Holographic effect for rare cards */
+.holographic {
+  background: linear-gradient(
+    125deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.05) 25%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.05) 75%,
+    rgba(255, 255, 255, 0.1) 100%
+  );
+  background-size: 200% 200%;
+  animation: holographic-shift 3s ease-in-out infinite;
+}
+
+@keyframes holographic-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Pokemon type colors */
+.type-fire { background: linear-gradient(135deg, #F08030, #DD6610); }
+.type-water { background: linear-gradient(135deg, #6890F0, #386CEB); }
+.type-grass { background: linear-gradient(135deg, #78C850, #5CA935); }
+.type-electric { background: linear-gradient(135deg, #F8D030, #F0C108); }
+.type-psychic { background: linear-gradient(135deg, #F85888, #F61C5D); }
+.type-dark { background: linear-gradient(135deg, #705848, #513F34); }
+.type-dragon { background: linear-gradient(135deg, #7038F8, #4C08EF); }
+
+/* MTG mana colors */
+.mana-white { background: #F8F6D8; color: #211B1B; }
+.mana-blue { background: #0E68AB; }
+.mana-black { background: #211B1B; }
+.mana-red { background: #D3202A; }
+.mana-green { background: #00733E; }
+
+/* Sport card effects */
+.sports-rookie {
+  border: 2px solid #FFD700;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+}
+
+.sports-auto {
+  position: relative;
+}
+
+.sports-auto::after {
+  content: '✍️';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 0.75rem;
+}
+
+/* Grading badge styles */
+.grade-10 { background: linear-gradient(135deg, #FFD700, #FFA500); color: #000; }
+.grade-9 { background: linear-gradient(135deg, #C0C0C0, #A8A8A8); color: #000; }
+.grade-8 { background: linear-gradient(135deg, #CD7F32, #B8860B); color: #000; }
+
+/* Loading shimmer */
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  animation: shimmer 2s infinite;
+}
+
+/* Glass morphism */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
