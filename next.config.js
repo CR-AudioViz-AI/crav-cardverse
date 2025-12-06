@@ -9,9 +9,6 @@ const nextConfig = {
       { protocol: 'https', hostname: '*.tcgplayer.com' },
     ],
   },
-  experimental: {
-    serverActions: true,
-  },
 }
 
 module.exports = nextConfig
