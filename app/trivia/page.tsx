@@ -6,431 +6,578 @@ import {
   Gamepad2,
   Trophy,
   Zap,
-  Timer,
+  Star,
+  Clock,
   CheckCircle,
   XCircle,
-  ChevronLeft,
-  Play,
+  ArrowRight,
+  RotateCcw,
   Flame,
-  Star,
   Target,
-  Brain,
   Award,
+  Brain,
 } from 'lucide-react'
-import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 
-const CATEGORIES = [
-  { id: 'all', name: 'All Categories', icon: '🎴', color: 'from-purple-500 to-pink-500' },
-  { id: 'pokemon', name: 'Pokémon', icon: '⚡', color: 'from-yellow-500 to-red-500' },
-  { id: 'mtg', name: 'Magic: The Gathering', icon: '✨', color: 'from-blue-500 to-purple-500' },
-  { id: 'sports', name: 'Sports Cards', icon: '🏆', color: 'from-green-500 to-emerald-500' },
-  { id: 'yugioh', name: 'Yu-Gi-Oh!', icon: '🐉', color: 'from-orange-500 to-red-500' },
-  { id: 'history', name: 'Card History', icon: '🏛️', color: 'from-amber-500 to-orange-500' },
-  { id: 'grading', name: 'Grading Knowledge', icon: '📊', color: 'from-cyan-500 to-blue-500' },
-]
-
-const SAMPLE_QUESTIONS = [
+// Comprehensive trivia questions
+const TRIVIA_QUESTIONS = [
   {
     id: '1',
     category: 'pokemon',
     difficulty: 'easy',
     question: 'What is the first Pokémon in the National Pokédex?',
     options: ['Pikachu', 'Bulbasaur', 'Charmander', 'Squirtle'],
-    correct_answer: 1,
-    explanation: 'Bulbasaur is #001 in the National Pokédex.',
-    xp_reward: 10,
+    correct: 1,
+    explanation: 'Bulbasaur is #001 in the National Pokédex, making it the first Pokémon ever listed.',
+    xp: 10,
   },
   {
     id: '2',
     category: 'pokemon',
     difficulty: 'medium',
-    question: 'Which Pokémon card is known as the "Holy Grail" of Pokémon collecting?',
-    options: ['Pikachu Illustrator', '1st Ed Charizard', 'Ancient Mew', 'Shining Charizard'],
-    correct_answer: 0,
-    explanation: 'The Pikachu Illustrator card is the rarest, with only 39 copies known to exist.',
-    xp_reward: 20,
+    question: 'Which Pokémon card sold for over $5 million, making it the most expensive Pokémon card ever?',
+    options: ['1st Edition Charizard', 'Pikachu Illustrator', 'Shining Charizard', 'Trophy Pikachu'],
+    correct: 1,
+    explanation: 'The Pikachu Illustrator card sold for $5.275 million in 2021. Only 39 copies exist.',
+    xp: 20,
   },
   {
     id: '3',
-    category: 'mtg',
-    difficulty: 'easy',
-    question: 'What is the most valuable Magic: The Gathering card?',
-    options: ['Black Lotus', 'Time Walk', 'Ancestral Recall', 'Mox Sapphire'],
-    correct_answer: 0,
-    explanation: 'Black Lotus from Alpha is the most valuable MTG card.',
-    xp_reward: 10,
+    category: 'pokemon',
+    difficulty: 'hard',
+    question: 'What makes a "Shadowless" Base Set card different from unlimited prints?',
+    options: ['Different artwork', 'No shadow under the image box', 'Gold borders', 'Holographic back'],
+    correct: 1,
+    explanation: 'Shadowless cards lack the drop shadow under the character image box that appears on unlimited prints.',
+    xp: 30,
   },
   {
     id: '4',
-    category: 'sports',
-    difficulty: 'medium',
-    question: 'What was the "Junk Wax Era"?',
-    options: ['1970-1979', '1980-1985', '1986-1993', '1994-2000'],
-    correct_answer: 2,
-    explanation: 'The Junk Wax Era (1986-1993) saw massive overproduction of sports cards.',
-    xp_reward: 20,
+    category: 'mtg',
+    difficulty: 'easy',
+    question: 'What is the most powerful and valuable card in Magic: The Gathering?',
+    options: ['Time Walk', 'Black Lotus', 'Ancestral Recall', 'Mox Sapphire'],
+    correct: 1,
+    explanation: 'Black Lotus provides 3 mana of any color for free, making it the most powerful and valuable MTG card.',
+    xp: 10,
   },
   {
     id: '5',
+    category: 'mtg',
+    difficulty: 'medium',
+    question: 'What year was Magic: The Gathering first released?',
+    options: ['1991', '1992', '1993', '1994'],
+    correct: 2,
+    explanation: 'MTG was created by Richard Garfield and released by Wizards of the Coast in 1993.',
+    xp: 20,
+  },
+  {
+    id: '6',
+    category: 'mtg',
+    difficulty: 'hard',
+    question: 'What is the "Reserved List" in Magic: The Gathering?',
+    options: [
+      'Cards banned in tournaments',
+      'Cards that will never be reprinted',
+      'First edition cards only',
+      'Cards with special artwork'
+    ],
+    correct: 1,
+    explanation: 'The Reserved List is a commitment by Wizards to never reprint certain powerful/valuable cards.',
+    xp: 30,
+  },
+  {
+    id: '7',
+    category: 'sports',
+    difficulty: 'easy',
+    question: 'What does "RC" stand for on a sports card?',
+    options: ['Rare Card', 'Rookie Card', 'Regular Card', 'Rated Card'],
+    correct: 1,
+    explanation: 'RC stands for Rookie Card - a players first officially licensed trading card.',
+    xp: 10,
+  },
+  {
+    id: '8',
+    category: 'sports',
+    difficulty: 'medium',
+    question: 'Which baseball card is known as the "Holy Grail" of collecting?',
+    options: ['1952 Mickey Mantle', 'T206 Honus Wagner', '1989 Ken Griffey Jr.', '1933 Babe Ruth'],
+    correct: 1,
+    explanation: 'The T206 Honus Wagner is considered the most valuable baseball card, selling for over $7 million.',
+    xp: 20,
+  },
+  {
+    id: '9',
+    category: 'sports',
+    difficulty: 'hard',
+    question: 'What was the "Junk Wax Era" in sports card collecting?',
+    options: ['1970-1979', '1980-1985', '1986-1993', '1994-2000'],
+    correct: 2,
+    explanation: 'The Junk Wax Era (1986-1993) saw massive overproduction, making most cards from this period worthless.',
+    xp: 30,
+  },
+  {
+    id: '10',
     category: 'grading',
     difficulty: 'easy',
     question: 'What is the highest grade a card can receive from PSA?',
     options: ['9', '9.5', '10', '11'],
-    correct_answer: 2,
-    explanation: 'PSA 10 Gem Mint is the highest grade.',
-    xp_reward: 10,
+    correct: 2,
+    explanation: 'PSA 10 Gem Mint is the highest grade, indicating perfect condition.',
+    xp: 10,
+  },
+  {
+    id: '11',
+    category: 'grading',
+    difficulty: 'medium',
+    question: 'What does BGS stand for?',
+    options: ['Best Grading Service', 'Beckett Grading Services', 'Baseball Grading System', 'Basic Grade Score'],
+    correct: 1,
+    explanation: 'BGS stands for Beckett Grading Services, known for their subgrades system.',
+    xp: 20,
+  },
+  {
+    id: '12',
+    category: 'grading',
+    difficulty: 'hard',
+    question: 'What is a "Black Label" BGS 10?',
+    options: [
+      'A card with a black border',
+      'A BGS 10 with all four subgrades also being 10',
+      'A graded card in a black case',
+      'A card graded before 2010'
+    ],
+    correct: 1,
+    explanation: 'A Black Label BGS 10 means all four subgrades (centering, corners, edges, surface) are perfect 10s.',
+    xp: 30,
+  },
+  {
+    id: '13',
+    category: 'history',
+    difficulty: 'medium',
+    question: 'Why did Topps dump 1952 baseball cards into the Atlantic Ocean?',
+    options: ['They were defective', 'Unsold inventory storage costs', 'Licensing dispute', 'Government regulation'],
+    correct: 1,
+    explanation: 'Topps dumped unsold inventory to avoid storage costs, accidentally creating the scarcity that makes 1952 cards so valuable.',
+    xp: 25,
+  },
+  {
+    id: '14',
+    category: 'yugioh',
+    difficulty: 'easy',
+    question: 'What is the most iconic Yu-Gi-Oh! monster card?',
+    options: ['Dark Magician', 'Blue-Eyes White Dragon', 'Red-Eyes Black Dragon', 'Exodia'],
+    correct: 1,
+    explanation: 'Blue-Eyes White Dragon is the signature card of Seto Kaiba and the most recognizable Yu-Gi-Oh! card.',
+    xp: 10,
+  },
+  {
+    id: '15',
+    category: 'general',
+    difficulty: 'medium',
+    question: 'What company currently owns the exclusive MLB trading card license?',
+    options: ['Topps', 'Panini', 'Upper Deck', 'Fanatics'],
+    correct: 3,
+    explanation: 'Fanatics acquired Topps and now holds the exclusive MLB license starting in 2025.',
+    xp: 20,
   },
 ]
 
-const LEADERBOARD = [
-  { rank: 1, name: 'CardMaster99', score: 15420, streak: 45, avatar: '🥇' },
-  { rank: 2, name: 'PokeFan2000', score: 12350, streak: 32, avatar: '🥈' },
-  { rank: 3, name: 'VintageKing', score: 11200, streak: 28, avatar: '🥉' },
-  { rank: 4, name: 'MTGWizard', score: 9800, streak: 22, avatar: '🎴' },
-  { rank: 5, name: 'RookieHunter', score: 8500, streak: 18, avatar: '🏆' },
+const CATEGORIES = [
+  { id: 'all', name: 'All Categories', icon: '🎯', color: 'from-purple-500 to-pink-500' },
+  { id: 'pokemon', name: 'Pokémon', icon: '⚡', color: 'from-yellow-500 to-orange-500' },
+  { id: 'mtg', name: 'Magic: The Gathering', icon: '🌀', color: 'from-blue-500 to-purple-500' },
+  { id: 'sports', name: 'Sports Cards', icon: '⚾', color: 'from-green-500 to-emerald-500' },
+  { id: 'yugioh', name: 'Yu-Gi-Oh!', icon: '🐉', color: 'from-indigo-500 to-purple-500' },
+  { id: 'grading', name: 'Grading', icon: '📊', color: 'from-red-500 to-orange-500' },
+  { id: 'history', name: 'Card History', icon: '📜', color: 'from-amber-500 to-yellow-500' },
 ]
 
+type GameState = 'menu' | 'playing' | 'result' | 'answer'
+
 export default function TriviaPage() {
-  const [gameState, setGameState] = useState<'menu' | 'playing' | 'results'>('menu')
+  const [gameState, setGameState] = useState<GameState>('menu')
   const [selectedCategory, setSelectedCategory] = useState('all')
-  const [currentQuestion, setCurrentQuestion] = useState(0)
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [score, setScore] = useState(0)
   const [streak, setStreak] = useState(0)
   const [bestStreak, setBestStreak] = useState(0)
   const [xpEarned, setXpEarned] = useState(0)
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
-  const [showExplanation, setShowExplanation] = useState(false)
-  const [questions, setQuestions] = useState(SAMPLE_QUESTIONS)
   const [timeLeft, setTimeLeft] = useState(30)
+  const [questions, setQuestions] = useState<typeof TRIVIA_QUESTIONS>([])
+  const [answers, setAnswers] = useState<boolean[]>([])
 
-  useEffect(() => {
-    if (gameState === 'playing' && timeLeft > 0 && selectedAnswer === null) {
-      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000)
-      return () => clearTimeout(timer)
-    }
-    if (timeLeft === 0 && selectedAnswer === null) {
-      handleAnswer(-1) // Time's up
-    }
-  }, [timeLeft, gameState, selectedAnswer])
-
-  const startGame = () => {
-    const filtered = selectedCategory === 'all' 
-      ? SAMPLE_QUESTIONS 
-      : SAMPLE_QUESTIONS.filter(q => q.category === selectedCategory)
-    setQuestions(filtered.sort(() => Math.random() - 0.5))
-    setCurrentQuestion(0)
+  // Filter and shuffle questions
+  const startGame = (category: string) => {
+    setSelectedCategory(category)
+    const filtered = category === 'all' 
+      ? TRIVIA_QUESTIONS 
+      : TRIVIA_QUESTIONS.filter(q => q.category === category)
+    const shuffled = [...filtered].sort(() => Math.random() - 0.5).slice(0, 10)
+    setQuestions(shuffled)
+    setCurrentQuestionIndex(0)
     setScore(0)
     setStreak(0)
     setXpEarned(0)
+    setAnswers([])
     setSelectedAnswer(null)
-    setShowExplanation(false)
     setTimeLeft(30)
     setGameState('playing')
   }
 
+  // Timer
+  useEffect(() => {
+    if (gameState === 'playing' && timeLeft > 0) {
+      const timer = setTimeout(() => setTimeLeft(t => t - 1), 1000)
+      return () => clearTimeout(timer)
+    } else if (timeLeft === 0 && gameState === 'playing') {
+      handleAnswer(-1) // Time's up, wrong answer
+    }
+  }, [gameState, timeLeft])
+
   const handleAnswer = (answerIndex: number) => {
     if (selectedAnswer !== null) return
-    
     setSelectedAnswer(answerIndex)
-    const question = questions[currentQuestion]
-    const isCorrect = answerIndex === question.correct_answer
-
+    
+    const currentQuestion = questions[currentQuestionIndex]
+    const isCorrect = answerIndex === currentQuestion.correct
+    
+    setAnswers([...answers, isCorrect])
+    
     if (isCorrect) {
-      setScore(score + 1)
-      setStreak(streak + 1)
-      setXpEarned(xpEarned + question.xp_reward)
+      const streakBonus = streak >= 3 ? Math.floor(currentQuestion.xp * 0.5) : 0
+      const timeBonus = Math.floor(timeLeft / 3)
+      const totalXp = currentQuestion.xp + streakBonus + timeBonus
+      
+      setScore(s => s + 1)
+      setStreak(s => s + 1)
+      setXpEarned(x => x + totalXp)
       if (streak + 1 > bestStreak) setBestStreak(streak + 1)
     } else {
       setStreak(0)
     }
-
-    setShowExplanation(true)
+    
+    setGameState('answer')
   }
 
   const nextQuestion = () => {
-    if (currentQuestion + 1 >= questions.length) {
-      setGameState('results')
-    } else {
-      setCurrentQuestion(currentQuestion + 1)
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(i => i + 1)
       setSelectedAnswer(null)
-      setShowExplanation(false)
       setTimeLeft(30)
+      setGameState('playing')
+    } else {
+      setGameState('result')
     }
   }
 
-  const question = questions[currentQuestion]
+  const currentQuestion = questions[currentQuestionIndex]
 
   return (
     <div className="min-h-screen bg-background p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <Link href="/">
-            <Button variant="ghost" size="icon">
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-3xl font-display font-bold flex items-center gap-3">
-              <Gamepad2 className="h-8 w-8" />
-              Card Trivia
-            </h1>
-            <p className="text-muted-foreground">Test your card knowledge!</p>
-          </div>
-        </div>
-        {gameState === 'playing' && (
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Flame className="h-5 w-5 text-orange-500" />
-              <span className="font-bold">{streak} streak</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Star className="h-5 w-5 text-yellow-500" />
-              <span className="font-bold">{xpEarned} XP</span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <AnimatePresence mode="wait">
-        {/* MENU STATE */}
-        {gameState === 'menu' && (
-          <motion.div
-            key="menu"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="max-w-4xl mx-auto space-y-8"
-          >
-            {/* Category Selection */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Choose a Category</CardTitle>
-                <CardDescription>Select a category to test your knowledge</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  {CATEGORIES.map((cat) => (
-                    <Button
-                      key={cat.id}
-                      variant={selectedCategory === cat.id ? 'default' : 'outline'}
-                      className={`h-auto p-4 flex flex-col items-center gap-2 ${
-                        selectedCategory === cat.id ? `bg-gradient-to-br ${cat.color}` : ''
-                      }`}
-                      onClick={() => setSelectedCategory(cat.id)}
-                    >
-                      <span className="text-2xl">{cat.icon}</span>
-                      <span className="text-sm">{cat.name}</span>
-                    </Button>
-                  ))}
+      <div className="max-w-4xl mx-auto">
+        <AnimatePresence mode="wait">
+          {/* Menu State */}
+          {gameState === 'menu' && (
+            <motion.div
+              key="menu"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-8"
+            >
+              {/* Header */}
+              <div className="text-center">
+                <div className="inline-flex items-center justify-center h-20 w-20 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 mb-4">
+                  <Gamepad2 className="h-10 w-10 text-white" />
                 </div>
-              </CardContent>
-            </Card>
+                <h1 className="text-4xl font-display font-bold">Card Trivia</h1>
+                <p className="text-muted-foreground mt-2">
+                  Test your trading card knowledge and earn XP!
+                </p>
+              </div>
 
-            {/* Start Game */}
-            <div className="text-center">
-              <Button size="lg" className="gap-2 px-8" onClick={startGame}>
-                <Play className="h-5 w-5" />
-                Start Game
-              </Button>
-            </div>
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-4">
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <Trophy className="h-6 w-6 text-yellow-500 mx-auto mb-2" />
+                    <p className="text-2xl font-bold">1,247</p>
+                    <p className="text-xs text-muted-foreground">Total XP Earned</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <Flame className="h-6 w-6 text-orange-500 mx-auto mb-2" />
+                    <p className="text-2xl font-bold">{bestStreak}</p>
+                    <p className="text-xs text-muted-foreground">Best Streak</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <Target className="h-6 w-6 text-green-500 mx-auto mb-2" />
+                    <p className="text-2xl font-bold">78%</p>
+                    <p className="text-xs text-muted-foreground">Accuracy</p>
+                  </CardContent>
+                </Card>
+              </div>
 
-            {/* Leaderboard */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Trophy className="h-5 w-5 text-yellow-500" />
-                  Leaderboard
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {LEADERBOARD.map((player) => (
-                    <div
-                      key={player.rank}
-                      className={`flex items-center gap-4 p-3 rounded-lg ${
-                        player.rank <= 3 ? 'bg-gradient-to-r from-yellow-500/10 to-orange-500/10' : 'bg-muted/50'
-                      }`}
-                    >
-                      <span className="text-2xl">{player.avatar}</span>
-                      <div className="flex-1">
-                        <p className="font-semibold">{player.name}</p>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Flame className="h-3 w-3 text-orange-500" />
-                          Best streak: {player.streak}
-                        </div>
+              {/* Category Selection */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Choose a Category</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {CATEGORIES.map((category) => (
+                      <motion.button
+                        key={category.id}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => startGame(category.id)}
+                        className={`p-4 rounded-xl bg-gradient-to-br ${category.color} text-white text-center transition-all hover:shadow-lg`}
+                      >
+                        <span className="text-2xl block mb-1">{category.icon}</span>
+                        <span className="text-sm font-medium">{category.name}</span>
+                      </motion.button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Recent Games */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Brain className="h-5 w-5" />
+                    Daily Challenge
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="p-4 rounded-xl bg-gradient-to-r from-purple-900/50 to-pink-900/50 border border-purple-500/30">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold">Mixed Categories Challenge</p>
+                        <p className="text-sm text-muted-foreground">20 questions • 50 XP bonus</p>
                       </div>
-                      <div className="text-right">
-                        <p className="font-bold text-lg">{player.score.toLocaleString()}</p>
-                        <p className="text-xs text-muted-foreground">points</p>
-                      </div>
+                      <Button onClick={() => startGame('all')}>
+                        Play Now
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Button>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
 
-        {/* PLAYING STATE */}
-        {gameState === 'playing' && question && (
-          <motion.div
-            key="playing"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="max-w-2xl mx-auto"
-          >
-            {/* Progress */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-2">
+          {/* Playing State */}
+          {(gameState === 'playing' || gameState === 'answer') && currentQuestion && (
+            <motion.div
+              key="playing"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-6"
+            >
+              {/* Progress Bar */}
+              <div className="flex items-center gap-4">
+                <Progress value={(currentQuestionIndex / questions.length) * 100} className="flex-1" />
                 <span className="text-sm text-muted-foreground">
-                  Question {currentQuestion + 1} of {questions.length}
+                  {currentQuestionIndex + 1} / {questions.length}
                 </span>
+              </div>
+
+              {/* Stats Row */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Badge variant="secondary" className="text-lg px-3 py-1">
+                    <Star className="h-4 w-4 mr-1" />
+                    {score} correct
+                  </Badge>
+                  {streak > 0 && (
+                    <Badge className="bg-orange-500 text-lg px-3 py-1">
+                      <Flame className="h-4 w-4 mr-1" />
+                      {streak} streak!
+                    </Badge>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
-                  <Timer className={`h-4 w-4 ${timeLeft <= 10 ? 'text-red-500' : 'text-muted-foreground'}`} />
-                  <span className={timeLeft <= 10 ? 'text-red-500 font-bold' : ''}>{timeLeft}s</span>
+                  <Clock className={`h-5 w-5 ${timeLeft <= 10 ? 'text-red-500' : 'text-muted-foreground'}`} />
+                  <span className={`text-xl font-bold ${timeLeft <= 10 ? 'text-red-500' : ''}`}>
+                    {timeLeft}s
+                  </span>
                 </div>
               </div>
-              <Progress value={(currentQuestion / questions.length) * 100} />
-            </div>
 
-            {/* Question Card */}
-            <Card className="mb-6">
-              <CardHeader>
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge variant={question.category as any}>{question.category}</Badge>
-                  <Badge variant="outline">{question.difficulty}</Badge>
-                  <Badge variant="secondary">+{question.xp_reward} XP</Badge>
-                </div>
-                <CardTitle className="text-xl">{question.question}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {question.options.map((option, index) => {
-                  let buttonClass = 'w-full justify-start text-left h-auto p-4'
+              {/* Question Card */}
+              <Card className="overflow-hidden">
+                <div className={`h-2 bg-gradient-to-r ${CATEGORIES.find(c => c.id === currentQuestion.category)?.color}`} />
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Badge variant="outline">{currentQuestion.category}</Badge>
+                    <Badge variant={
+                      currentQuestion.difficulty === 'easy' ? 'secondary' :
+                      currentQuestion.difficulty === 'medium' ? 'default' : 'destructive'
+                    }>
+                      {currentQuestion.difficulty}
+                    </Badge>
+                    <Badge variant="secondary" className="ml-auto">
+                      +{currentQuestion.xp} XP
+                    </Badge>
+                  </div>
                   
-                  if (selectedAnswer !== null) {
-                    if (index === question.correct_answer) {
-                      buttonClass += ' bg-green-500/20 border-green-500 text-green-400'
-                    } else if (index === selectedAnswer && index !== question.correct_answer) {
-                      buttonClass += ' bg-red-500/20 border-red-500 text-red-400'
-                    }
-                  }
+                  <h2 className="text-xl font-semibold mb-6">{currentQuestion.question}</h2>
+                  
+                  <div className="grid gap-3">
+                    {currentQuestion.options.map((option, index) => {
+                      const isSelected = selectedAnswer === index
+                      const isCorrect = index === currentQuestion.correct
+                      const showResult = gameState === 'answer'
+                      
+                      let buttonClass = 'w-full p-4 text-left rounded-xl border-2 transition-all '
+                      
+                      if (showResult) {
+                        if (isCorrect) {
+                          buttonClass += 'border-green-500 bg-green-500/10 text-green-400'
+                        } else if (isSelected && !isCorrect) {
+                          buttonClass += 'border-red-500 bg-red-500/10 text-red-400'
+                        } else {
+                          buttonClass += 'border-muted bg-muted/50 opacity-50'
+                        }
+                      } else {
+                        buttonClass += 'border-muted hover:border-primary hover:bg-primary/5'
+                      }
+                      
+                      return (
+                        <motion.button
+                          key={index}
+                          whileHover={gameState === 'playing' ? { scale: 1.01 } : {}}
+                          whileTap={gameState === 'playing' ? { scale: 0.99 } : {}}
+                          onClick={() => gameState === 'playing' && handleAnswer(index)}
+                          disabled={gameState === 'answer'}
+                          className={buttonClass}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="h-8 w-8 rounded-full bg-muted flex items-center justify-center font-medium">
+                              {String.fromCharCode(65 + index)}
+                            </span>
+                            <span className="flex-1">{option}</span>
+                            {showResult && isCorrect && (
+                              <CheckCircle className="h-5 w-5 text-green-500" />
+                            )}
+                            {showResult && isSelected && !isCorrect && (
+                              <XCircle className="h-5 w-5 text-red-500" />
+                            )}
+                          </div>
+                        </motion.button>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
 
-                  return (
-                    <Button
-                      key={index}
-                      variant="outline"
-                      className={buttonClass}
-                      onClick={() => handleAnswer(index)}
-                      disabled={selectedAnswer !== null}
-                    >
-                      <span className="flex items-center gap-3">
-                        <span className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-sm font-bold">
-                          {String.fromCharCode(65 + index)}
-                        </span>
-                        {option}
-                        {selectedAnswer !== null && index === question.correct_answer && (
-                          <CheckCircle className="h-5 w-5 text-green-500 ml-auto" />
-                        )}
-                        {selectedAnswer !== null && index === selectedAnswer && index !== question.correct_answer && (
-                          <XCircle className="h-5 w-5 text-red-500 ml-auto" />
-                        )}
-                      </span>
-                    </Button>
-                  )
-                })}
-              </CardContent>
-            </Card>
-
-            {/* Explanation */}
-            <AnimatePresence>
-              {showExplanation && (
+              {/* Answer Explanation */}
+              {gameState === 'answer' && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 20 }}
                 >
-                  <Card className={`mb-6 ${
-                    selectedAnswer === question.correct_answer 
-                      ? 'border-green-500/50 bg-green-500/5' 
-                      : 'border-red-500/50 bg-red-500/5'
-                  }`}>
+                  <Card>
                     <CardContent className="p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        {selectedAnswer === question.correct_answer ? (
-                          <>
-                            <CheckCircle className="h-5 w-5 text-green-500" />
-                            <span className="font-semibold text-green-500">Correct! +{question.xp_reward} XP</span>
-                          </>
+                      <div className="flex items-start gap-3">
+                        {selectedAnswer === currentQuestion.correct ? (
+                          <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0" />
                         ) : (
-                          <>
-                            <XCircle className="h-5 w-5 text-red-500" />
-                            <span className="font-semibold text-red-500">Incorrect</span>
-                          </>
+                          <XCircle className="h-6 w-6 text-red-500 flex-shrink-0" />
                         )}
+                        <div>
+                          <p className="font-medium">
+                            {selectedAnswer === currentQuestion.correct ? 'Correct!' : 'Not quite!'}
+                          </p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {currentQuestion.explanation}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-muted-foreground">{question.explanation}</p>
+                      <Button onClick={nextQuestion} className="w-full mt-4">
+                        {currentQuestionIndex < questions.length - 1 ? 'Next Question' : 'See Results'}
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </Button>
                     </CardContent>
                   </Card>
-                  <Button className="w-full" onClick={nextQuestion}>
-                    {currentQuestion + 1 >= questions.length ? 'See Results' : 'Next Question'}
-                  </Button>
                 </motion.div>
               )}
-            </AnimatePresence>
-          </motion.div>
-        )}
+            </motion.div>
+          )}
 
-        {/* RESULTS STATE */}
-        {gameState === 'results' && (
-          <motion.div
-            key="results"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="max-w-md mx-auto text-center"
-          >
-            <Card className="overflow-hidden">
-              <div className="h-32 bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
-                <Trophy className="h-16 w-16 text-white" />
+          {/* Result State */}
+          {gameState === 'result' && (
+            <motion.div
+              key="result"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="text-center space-y-6"
+            >
+              <div className="inline-flex items-center justify-center h-24 w-24 rounded-full bg-gradient-to-br from-yellow-500 to-orange-500 mb-4">
+                <Trophy className="h-12 w-12 text-white" />
               </div>
-              <CardContent className="p-6">
-                <h2 className="text-2xl font-bold mb-2">Game Complete!</h2>
-                <p className="text-muted-foreground mb-6">Great job testing your card knowledge!</p>
-                
-                <div className="grid grid-cols-3 gap-4 mb-6">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-green-500">{score}</div>
-                    <div className="text-sm text-muted-foreground">Correct</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-yellow-500">{xpEarned}</div>
-                    <div className="text-sm text-muted-foreground">XP Earned</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-orange-500">{bestStreak}</div>
-                    <div className="text-sm text-muted-foreground">Best Streak</div>
-                  </div>
-                </div>
+              
+              <h1 className="text-4xl font-display font-bold">Game Complete!</h1>
+              
+              <div className="grid grid-cols-3 gap-4 max-w-md mx-auto">
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <p className="text-3xl font-bold text-green-400">{score}</p>
+                    <p className="text-xs text-muted-foreground">Correct</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <p className="text-3xl font-bold text-purple-400">+{xpEarned}</p>
+                    <p className="text-xs text-muted-foreground">XP Earned</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <p className="text-3xl font-bold text-orange-400">{bestStreak}</p>
+                    <p className="text-xs text-muted-foreground">Best Streak</p>
+                  </CardContent>
+                </Card>
+              </div>
 
-                <div className="space-y-3">
-                  <Button className="w-full" onClick={startGame}>
-                    Play Again
-                  </Button>
-                  <Button variant="outline" className="w-full" onClick={() => setGameState('menu')}>
-                    Back to Menu
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              {/* Answer Summary */}
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex justify-center gap-2">
+                    {answers.map((correct, i) => (
+                      <div
+                        key={i}
+                        className={`h-3 w-3 rounded-full ${correct ? 'bg-green-500' : 'bg-red-500'}`}
+                      />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="flex gap-4 justify-center">
+                <Button variant="outline" onClick={() => setGameState('menu')}>
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Play Again
+                </Button>
+                <Button onClick={() => startGame(selectedCategory)}>
+                  Same Category
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   )
 }
