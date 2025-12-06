@@ -41,6 +41,12 @@ interface CardBase {
   cardType: string;
   discoveryHint?: string;
   maxSupply?: number;
+  // Optional user-specific properties (populated when card is owned)
+  discoveredAt?: string;
+  instanceNumber?: number;
+  isFoil?: boolean;
+  isFirstEdition?: boolean;
+  isFavorite?: boolean;
 }
 
 interface UserCard extends CardBase {
@@ -372,7 +378,7 @@ export default function DigitalCardsPage() {
                               </div>
                             )}
                             
-                            {'isFoil' in card && card.isFoil && (
+                            {card.isFoil && (
                               <div className="absolute top-1 right-1">
                                 <Sparkles className="w-3 h-3 text-purple-400" />
                               </div>
@@ -613,5 +619,6 @@ export default function DigitalCardsPage() {
     </div>
   );
 }
+
 
 
