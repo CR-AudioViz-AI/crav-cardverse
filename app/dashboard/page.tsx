@@ -1,223 +1,260 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { 
-  LayoutDashboard, 
-  CreditCard, 
-  Trophy, 
-  Star, 
-  Settings, 
-  TrendingUp,
-  Store,
-  Users,
+import {
+  LayoutDashboard,
+  CreditCard,
+  Trophy,
   Gamepad2,
+  Store,
+  Settings,
   LogOut,
-  Sparkles
+  Plus,
+  TrendingUp,
+  Star,
+  Clock,
+  Zap,
 } from 'lucide-react';
+import { CrossSellBanner } from '@/components/cross-sell-banner';
+import { UpgradeModal } from '@/components/upgrade-modal';
+import { TIER_CONFIGS, SubscriptionTier, getRemainingCards } from '@/lib/tier-limits';
 
-interface UserStats {
-  totalCards: number;
-  totalValue: number;
-  rareCards: number;
-  gamesPlayed: number;
-  achievementsUnlocked: number;
-}
+// Mock data - replace with real Supabase queries
+const mockUserData = {
+  name: 'Collector',
+  tier: 'free' as SubscriptionTier,
+  cardCount: 12,
+  collectionValue: 450,
+  achievements: 3,
+  triviaPlayed: 15,
+};
+
+const mockRecentCards = [
+  { id: 1, name: 'Rare Dragon', rarity: 'Rare', image: '🐉', value: 120 },
+  { id: 2, name: 'Golden Phoenix', rarity: 'Epic', image: '🦅', value: 280 },
+  { id: 3, name: 'Crystal Unicorn', rarity: 'Legendary', image: '🦄', value: 500 },
+];
+
+const mockActivity = [
+  { id: 1, action: 'Added new card', item: 'Rare Dragon', time: '2 hours ago' },
+  { id: 2, action: 'Won trivia', item: '+50 points', time: '5 hours ago' },
+  { id: 3, action: 'Traded card', item: 'Common Wolf', time: '1 day ago' },
+];
 
 export default function DashboardPage() {
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<UserStats>({
-    totalCards: 0,
-    totalValue: 0,
-    rareCards: 0,
-    gamesPlayed: 0,
-    achievementsUnlocked: 0,
-  });
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [userData, setUserData] = useState(mockUserData);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setStats({
-        totalCards: 47,
-        totalValue: 1250,
-        rareCards: 8,
-        gamesPlayed: 23,
-        achievementsUnlocked: 12,
-      });
-      setLoading(false);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, []);
+  const tierConfig = TIER_CONFIGS[userData.tier];
+  const remainingCards = getRemainingCards(userData.cardCount, userData.tier);
+  const usagePercent = tierConfig.maxCards === Infinity 
+    ? 0 
+    : Math.round((userData.cardCount / tierConfig.maxCards) * 100);
 
-  const menuItems = [
-    { icon: LayoutDashboard, label: 'Overview', href: '/dashboard', active: true },
-    { icon: CreditCard, label: 'My Cards', href: '/collection' },
-    { icon: Store, label: 'Marketplace', href: '/marketplace' },
-    { icon: Gamepad2, label: 'Trivia', href: '/trivia' },
-    { icon: Trophy, label: 'Achievements', href: '/clubs' },
-    { icon: Sparkles, label: 'Exclusives', href: '/exclusives' },
-    { icon: Users, label: 'Clubs', href: '/clubs' },
-    { icon: Settings, label: 'Settings', href: '/settings' },
-  ];
-
-  const quickActions = [
-    { label: 'Open Pack', href: '/collection?action=pack', icon: '🎴' },
-    { label: 'Play Trivia', href: '/trivia', icon: '🎮' },
-    { label: 'Browse Market', href: '/marketplace', icon: '🛒' },
-    { label: 'View Museum', href: '/museum', icon: '🏛️' },
-  ];
-
-  const recentCards = [
-    { name: 'Mickey Mouse Vintage', rarity: 'Legendary', value: '$450', image: '🏰' },
-    { name: 'Cinderella Castle', rarity: 'Rare', value: '$85', image: '👸' },
-    { name: 'Space Mountain', rarity: 'Epic', value: '$120', image: '🚀' },
-    { name: 'Pirates of Caribbean', rarity: 'Rare', value: '$75', image: '🏴‍☠️' },
-  ];
-
-  const rarityColors: Record<string, string> = {
-    'Common': 'text-gray-400',
-    'Rare': 'text-blue-400',
-    'Epic': 'text-purple-400',
-    'Legendary': 'text-yellow-400',
+  const getRarityColor = (rarity: string) => {
+    switch (rarity) {
+      case 'Common': return 'text-gray-400';
+      case 'Rare': return 'text-blue-400';
+      case 'Epic': return 'text-purple-400';
+      case 'Legendary': return 'text-yellow-400';
+      default: return 'text-gray-400';
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-950 via-purple-950 to-black">
       <div className="flex">
         {/* Sidebar */}
-        <aside className="hidden md:flex w-64 min-h-screen flex-col border-r border-purple-900/30 bg-black/30">
-          <div className="p-6 border-b border-purple-900/30">
-            <Link href="/" className="flex items-center gap-2">
-              <span className="text-3xl">🎴</span>
-              <span className="text-xl font-bold text-purple-400">CardVerse</span>
-            </Link>
+        <aside className="w-64 min-h-screen bg-black/30 border-r border-purple-900/30 p-4">
+          <div className="flex items-center gap-2 mb-8">
+            <span className="text-3xl">🎴</span>
+            <span className="text-xl font-bold text-purple-400">CravCards</span>
           </div>
-          
-          <nav className="flex-1 p-4 space-y-1">
-            {menuItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition ${
-                    item.active
-                      ? 'bg-purple-500/20 text-purple-400'
-                      : 'text-gray-400 hover:bg-purple-500/10 hover:text-purple-300'
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  {item.label}
-                </Link>
-              );
-            })}
+
+          <nav className="space-y-2">
+            {[
+              { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard', active: true },
+              { icon: CreditCard, label: 'My Collection', href: '/collection' },
+              { icon: Store, label: 'Marketplace', href: '/marketplace' },
+              { icon: Gamepad2, label: 'Trivia', href: '/trivia' },
+              { icon: Trophy, label: 'Achievements', href: '/achievements' },
+              { icon: Settings, label: 'Settings', href: '/settings' },
+            ].map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                  item.active
+                    ? 'bg-purple-600/30 text-purple-300'
+                    : 'text-gray-400 hover:bg-purple-900/20 hover:text-purple-300'
+                }`}
+              >
+                <item.icon className="w-5 h-5" />
+                {item.label}
+              </Link>
+            ))}
           </nav>
 
-          <div className="p-4 border-t border-purple-900/30">
-            <button className="flex items-center gap-3 px-4 py-3 w-full text-gray-400 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition">
+          <div className="absolute bottom-4 left-4 right-4">
+            <Link
+              href="/login"
+              className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-red-400 transition"
+            >
               <LogOut className="w-5 h-5" />
               Sign Out
-            </button>
+            </Link>
           </div>
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 p-6 md:p-8">
+        <main className="flex-1 p-8">
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">Welcome Back, Collector</h1>
-            <p className="text-gray-400">Manage your digital card collection</p>
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-white">Welcome back!</h1>
+              <p className="text-purple-300">Here's your collection overview</p>
+            </div>
+            <Link
+              href="/collection"
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition"
+            >
+              <Plus className="w-5 h-5" />
+              Add Cards
+            </Link>
+          </div>
+
+          {/* Cross-Sell Banner */}
+          <CrossSellBanner variant="spirits" />
+
+          {/* Tier Status Bar */}
+          <div className="bg-purple-900/20 border border-purple-700/30 rounded-lg p-4 mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Zap className="w-5 h-5 text-purple-400" />
+                <span className="text-white font-medium">{tierConfig.name} Plan</span>
+                {userData.tier !== 'premium' && (
+                  <button
+                    onClick={() => setShowUpgradeModal(true)}
+                    className="text-xs px-2 py-1 bg-purple-600/50 text-purple-200 rounded hover:bg-purple-600 transition"
+                  >
+                    Upgrade
+                  </button>
+                )}
+              </div>
+              <span className="text-purple-300 text-sm">
+                {userData.cardCount} / {tierConfig.maxCards === Infinity ? '∞' : tierConfig.maxCards} cards
+              </span>
+            </div>
+            {tierConfig.maxCards !== Infinity && (
+              <div className="w-full bg-purple-900/50 rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full transition-all ${
+                    usagePercent >= 90 ? 'bg-red-500' : usagePercent >= 70 ? 'bg-yellow-500' : 'bg-purple-500'
+                  }`}
+                  style={{ width: `${Math.min(usagePercent, 100)}%` }}
+                />
+              </div>
+            )}
+            {remainingCards !== Infinity && remainingCards <= 10 && (
+              <p className="text-yellow-400 text-xs mt-2">
+                ⚠️ Only {remainingCards} cards remaining on your plan
+              </p>
+            )}
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {[
-              { label: 'Total Cards', value: stats.totalCards, icon: '🎴', color: 'purple' },
-              { label: 'Collection Value', value: `$${stats.totalValue.toLocaleString()}`, icon: '💰', color: 'green' },
-              { label: 'Rare Cards', value: stats.rareCards, icon: '⭐', color: 'yellow' },
-              { label: 'Trivia Played', value: stats.gamesPlayed, icon: '🎮', color: 'blue' },
-              { label: 'Achievements', value: stats.achievementsUnlocked, icon: '🏆', color: 'amber' },
+              { label: 'Total Cards', value: userData.cardCount, icon: CreditCard, color: 'purple' },
+              { label: 'Collection Value', value: `$${userData.collectionValue}`, icon: TrendingUp, color: 'green' },
+              { label: 'Achievements', value: userData.achievements, icon: Trophy, color: 'yellow' },
+              { label: 'Trivia Played', value: userData.triviaPlayed, icon: Gamepad2, color: 'blue' },
             ].map((stat) => (
               <div
                 key={stat.label}
-                className="bg-purple-900/20 border border-purple-700/30 rounded-xl p-4"
+                className="bg-purple-900/20 border border-purple-700/30 rounded-lg p-4"
               >
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl">{stat.icon}</span>
+                <div className="flex items-center justify-between mb-2">
+                  <stat.icon className={`w-8 h-8 text-${stat.color}-400`} />
                 </div>
-                <div className="text-2xl font-bold text-white">
-                  {loading ? '...' : stat.value}
-                </div>
-                <div className="text-sm text-gray-400">{stat.label}</div>
+                <p className="text-2xl font-bold text-white">{stat.value}</p>
+                <p className="text-purple-300 text-sm">{stat.label}</p>
               </div>
             ))}
           </div>
 
-          {/* Quick Actions */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-white mb-4">Quick Actions</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {quickActions.map((action) => (
-                <Link
-                  key={action.label}
-                  href={action.href}
-                  className="flex items-center gap-3 p-4 bg-purple-500/10 border border-purple-500/30 rounded-xl hover:bg-purple-500/20 transition"
-                >
-                  <span className="text-2xl">{action.icon}</span>
-                  <span className="font-medium text-purple-100">{action.label}</span>
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          {/* Recent Activity & Collection Preview */}
-          <div className="grid md:grid-cols-2 gap-6">
+          {/* Two Column Layout */}
+          <div className="grid lg:grid-cols-2 gap-6">
             {/* Recent Cards */}
-            <div className="bg-purple-900/20 border border-purple-700/30 rounded-xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-white">Recent Cards</h2>
-                <Link href="/collection" className="text-purple-400 text-sm hover:underline">
-                  View All →
-                </Link>
-              </div>
+            <div className="bg-purple-900/20 border border-purple-700/30 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                <Star className="w-5 h-5 text-yellow-400" />
+                Recent Cards
+              </h2>
               <div className="space-y-3">
-                {recentCards.map((card, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 bg-purple-950/50 rounded-lg">
+                {mockRecentCards.map((card) => (
+                  <div
+                    key={card.id}
+                    className="flex items-center justify-between p-3 bg-purple-900/30 rounded-lg"
+                  >
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">{card.image}</span>
                       <div>
-                        <p className="text-gray-200 font-medium">{card.name}</p>
-                        <p className={`text-xs ${rarityColors[card.rarity]}`}>{card.rarity}</p>
+                        <p className="text-white font-medium">{card.name}</p>
+                        <p className={`text-sm ${getRarityColor(card.rarity)}`}>{card.rarity}</p>
                       </div>
                     </div>
-                    <span className="text-green-400 font-semibold">{card.value}</span>
+                    <span className="text-green-400">${card.value}</span>
                   </div>
                 ))}
               </div>
+              <Link
+                href="/collection"
+                className="block text-center text-purple-400 hover:text-purple-300 mt-4 text-sm"
+              >
+                View all cards →
+              </Link>
             </div>
 
-            {/* Activity Feed */}
-            <div className="bg-purple-900/20 border border-purple-700/30 rounded-xl p-6">
-              <h2 className="text-xl font-semibold text-white mb-4">Recent Activity</h2>
-              <div className="space-y-4">
-                {[
-                  { action: 'Opened card pack', item: '3 new cards!', time: '1 hour ago' },
-                  { action: 'Won trivia match', item: '+50 points', time: '3 hours ago' },
-                  { action: 'Listed on marketplace', item: 'Goofy Classic', time: '1 day ago' },
-                  { action: 'Earned achievement', item: 'Card Collector I', time: '2 days ago' },
-                ].map((activity, i) => (
-                  <div key={i} className="flex items-center justify-between py-2 border-b border-purple-700/30 last:border-0">
+            {/* Recent Activity */}
+            <div className="bg-purple-900/20 border border-purple-700/30 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-purple-400" />
+                Recent Activity
+              </h2>
+              <div className="space-y-3">
+                {mockActivity.map((activity) => (
+                  <div
+                    key={activity.id}
+                    className="flex items-center justify-between p-3 bg-purple-900/30 rounded-lg"
+                  >
                     <div>
-                      <p className="text-gray-200">{activity.action}</p>
-                      <p className="text-sm text-purple-400">{activity.item}</p>
+                      <p className="text-white">{activity.action}</p>
+                      <p className="text-purple-400 text-sm">{activity.item}</p>
                     </div>
-                    <span className="text-xs text-gray-500">{activity.time}</span>
+                    <span className="text-gray-500 text-sm">{activity.time}</span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
+
+          {/* Footer */}
+          <div className="mt-8 text-center text-gray-500 text-sm">
+            <p>© 2025 CR AudioViz AI, LLC. Part of the CRAV ecosystem.</p>
+          </div>
         </main>
       </div>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        currentTier={userData.tier}
+        currentCount={userData.cardCount}
+        maxAllowed={tierConfig.maxCards}
+      />
     </div>
   );
 }
