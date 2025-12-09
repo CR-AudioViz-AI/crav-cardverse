@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useAuth } from '@/components/AuthProvider'
 import {
   Search,
   Plus,
@@ -13,11 +14,9 @@ import {
   Sparkles,
   Shield,
   TrendingUp,
-  ChevronRight,
   Loader2,
   Lock,
   Check,
-  Star,
 } from 'lucide-react'
 
 interface Club {
@@ -51,10 +50,10 @@ const CLUB_TYPES = [
 
 export default function ClubsPage() {
   const supabase = createClientComponentClient()
+  const { user, loading: authLoading } = useAuth()
   
   const [clubs, setClubs] = useState<Club[]>([])
   const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
   const [userClubs, setUserClubs] = useState<string[]>([])
   
   const [searchQuery, setSearchQuery] = useState('')
@@ -62,9 +61,6 @@ export default function ClubsPage() {
 
   useEffect(() => {
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-      
       if (user) {
         // Get user's club memberships
         const { data: memberships } = await supabase
@@ -79,7 +75,7 @@ export default function ClubsPage() {
     }
     
     init()
-  }, [supabase])
+  }, [user])
 
   const fetchClubs = async () => {
     setLoading(true)
@@ -135,11 +131,6 @@ export default function ClubsPage() {
       if (error) throw error
       
       setUserClubs([...userClubs, clubId])
-      
-      // Update member count
-      await supabase.rpc('increment_club_members', { club_id: clubId })
-      
-      // Refresh clubs
       fetchClubs()
     } catch (error) {
       console.error('Error joining club:', error)
@@ -166,6 +157,7 @@ export default function ClubsPage() {
             <p className="text-gray-400">Join communities of collectors who share your passion</p>
           </div>
           
+          {/* Show Create Club button if logged in */}
           {user && (
             <Link
               href="/clubs/create"
@@ -319,8 +311,8 @@ export default function ClubsPage() {
           </div>
         )}
 
-        {/* Create CTA */}
-        {!user && (
+        {/* Create CTA - Only show if NOT logged in */}
+        {!authLoading && !user && (
           <div className="mt-12 text-center bg-gradient-to-r from-purple-900/50 to-pink-900/50 rounded-2xl p-8 border border-purple-500/30">
             <Crown className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
             <h3 className="text-2xl font-bold text-white mb-2">Start Your Own Club</h3>
