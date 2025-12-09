@@ -88,53 +88,6 @@ const features = [
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-950 via-purple-950 to-black">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-purple-900/30 bg-black/50 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2">
-              <span className="text-3xl">🎴</span>
-              <span className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                CravCards
-              </span>
-            </Link>
-            
-            <nav className="hidden md:flex items-center gap-8">
-              <Link href="/collection" className="text-gray-300 hover:text-white transition">
-                Collection
-              </Link>
-              <Link href="/marketplace" className="text-gray-300 hover:text-white transition">
-                Marketplace
-              </Link>
-              <Link href="/trivia" className="text-gray-300 hover:text-white transition">
-                Trivia
-              </Link>
-              <Link href="/clubs" className="text-gray-300 hover:text-white transition">
-                Clubs
-              </Link>
-              <Link href="/pricing" className="text-gray-300 hover:text-white transition">
-                Pricing
-              </Link>
-            </nav>
-            
-            <div className="flex items-center gap-3">
-              <Link 
-                href="/auth/login" 
-                className="text-gray-300 hover:text-white transition px-4 py-2"
-              >
-                Sign In
-              </Link>
-              <Link 
-                href="/auth/signup" 
-                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition"
-              >
-                Get Started Free
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* Hero Section */}
       <section className="relative py-20 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-900/30 via-transparent to-transparent" />
@@ -153,41 +106,43 @@ export default function HomePage() {
           </h1>
           
           <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-8">
-            The ultimate platform for card collectors. Track sports cards, Pokémon, 
-            Magic: The Gathering, and any collectible cards in one beautiful app.
+            The ultimate platform for card collectors. Track sports cards, 
+            Pokémon, Magic: The Gathering, and any collectible cards in one 
+            beautiful app.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link 
-              href="/auth/signup"
-              className="px-8 py-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition flex items-center justify-center gap-2"
+              href="/auth/signup" 
+              className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-xl transition transform hover:scale-105"
             >
               Start Collecting Free
               <ArrowRight className="w-5 h-5" />
             </Link>
             <Link 
-              href="/pricing"
-              className="px-8 py-4 bg-purple-900/50 hover:bg-purple-900/70 text-purple-300 font-semibold rounded-xl border border-purple-700/50 transition"
+              href="/pricing" 
+              className="inline-flex items-center justify-center px-8 py-4 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl transition border border-white/20"
             >
               View Pricing
             </Link>
           </div>
           
-          <p className="text-gray-500 text-sm mt-4">
+          <p className="text-sm text-gray-500 mt-4">
             Free plan includes 50 cards • No credit card required
           </p>
         </div>
       </section>
 
       {/* Card Categories Section */}
-      <section className="py-20">
+      <section className="py-20 relative">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+            <h2 className="text-4xl font-bold text-white mb-4">
               Collect <span className="text-purple-400">Any Type</span> of Card
             </h2>
-            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-              From vintage sports cards to the latest Pokémon releases, CravCards supports every collecting hobby.
+            <p className="text-xl text-gray-400">
+              From vintage sports cards to the latest Pokémon releases, CravCards supports
+              every collecting hobby.
             </p>
           </div>
           
@@ -195,21 +150,16 @@ export default function HomePage() {
             {cardCategories.map((category) => (
               <div 
                 key={category.name}
-                className="group bg-purple-900/20 border border-purple-700/30 rounded-xl p-6 hover:border-purple-500/50 transition-all hover:scale-[1.02]"
+                className="group p-6 bg-gray-900/50 border border-gray-800 rounded-2xl hover:border-purple-700/50 transition-all hover:transform hover:scale-[1.02]"
               >
-                <div className={`inline-flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br ${category.color} mb-4`}>
-                  <span className="text-2xl">{category.emoji}</span>
+                <div className={`w-14 h-14 bg-gradient-to-br ${category.color} rounded-xl flex items-center justify-center text-2xl mb-4`}>
+                  {category.emoji}
                 </div>
-                
-                <h3 className="text-xl font-semibold text-white mb-2">{category.name}</h3>
-                <p className="text-gray-400 text-sm mb-4">{category.description}</p>
-                
+                <h3 className="text-xl font-bold text-white mb-2">{category.name}</h3>
+                <p className="text-gray-400 mb-4">{category.description}</p>
                 <div className="flex flex-wrap gap-2">
                   {category.examples.map((example) => (
-                    <span 
-                      key={example}
-                      className="px-2 py-1 bg-purple-900/50 text-purple-300 text-xs rounded-md"
-                    >
+                    <span key={example} className="text-xs px-2 py-1 bg-gray-800 text-gray-300 rounded">
                       {example}
                     </span>
                   ))}
@@ -221,145 +171,121 @@ export default function HomePage() {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-purple-950/30">
+      <section className="py-20 bg-black/30">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Everything You Need to <span className="text-purple-400">Collect</span>
+            <h2 className="text-4xl font-bold text-white mb-4">
+              Everything You Need to <span className="text-pink-400">Collect</span>
             </h2>
-            <p className="text-gray-400 text-lg">
-              Powerful features designed for serious collectors
+            <p className="text-xl text-gray-400">
+              Powerful tools designed for serious collectors.
             </p>
           </div>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {features.map((feature) => {
-              const Icon = feature.icon;
-              return (
-                <div key={feature.title} className="flex gap-4">
-                  <div className="flex-shrink-0 w-12 h-12 bg-purple-600/20 rounded-xl flex items-center justify-center">
-                    <Icon className="w-6 h-6 text-purple-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-1">{feature.title}</h3>
-                    <p className="text-gray-400 text-sm">{feature.description}</p>
-                  </div>
+            {features.map((feature) => (
+              <div key={feature.title} className="p-6 bg-gray-900/30 rounded-2xl border border-gray-800">
+                <div className="w-12 h-12 bg-purple-600/20 rounded-xl flex items-center justify-center mb-4">
+                  <feature.icon className="w-6 h-6 text-purple-400" />
                 </div>
-              );
-            })}
+                <h3 className="text-lg font-bold text-white mb-2">{feature.title}</h3>
+                <p className="text-gray-400">{feature.description}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
       <section className="py-20">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 border border-purple-500/30 rounded-2xl p-8 md:p-12 text-center">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-              Ready to Start Your Collection?
-            </h2>
-            <p className="text-gray-300 text-lg mb-8 max-w-xl mx-auto">
-              Join thousands of collectors tracking their cards on CravCards. 
-              Free to start, powerful enough to scale.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-6">
-              <Link 
-                href="/auth/signup"
-                className="px-8 py-4 bg-white text-purple-900 font-semibold rounded-xl transition hover:bg-gray-100 flex items-center justify-center gap-2"
-              >
-                <Zap className="w-5 h-5" />
-                Create Free Account
-              </Link>
-            </div>
-            
-            <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-400">
-              <span className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-green-400" />
-                50 cards free
-              </span>
-              <span className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-green-400" />
-                No credit card
-              </span>
-              <span className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-green-400" />
-                Upgrade anytime
-              </span>
-            </div>
-          </div>
+        <div className="max-w-4xl mx-auto px-4 text-center">
+          <h2 className="text-4xl font-bold text-white mb-6">
+            Ready to Start Your Collection?
+          </h2>
+          <p className="text-xl text-gray-400 mb-8">
+            Join thousands of collectors tracking their cards with CravCards.
+          </p>
+          <Link 
+            href="/auth/signup" 
+            className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold text-lg rounded-xl transition transform hover:scale-105"
+          >
+            Get Started Free
+            <ArrowRight className="w-5 h-5" />
+          </Link>
         </div>
       </section>
 
-      {/* Cross-Sell Banner */}
-      <section className="py-10 border-t border-purple-900/30">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="bg-gradient-to-r from-amber-900/30 to-amber-800/30 border border-amber-700/30 rounded-xl p-6 flex flex-col md:flex-row items-center gap-6">
-            <div className="text-4xl">🥃</div>
-            <div className="flex-1 text-center md:text-left">
-              <h3 className="text-lg font-semibold text-amber-100">Also collect spirits?</h3>
-              <p className="text-amber-200/70 text-sm">
-                Try CravBarrels - track your whiskey, bourbon, and spirits collection!
-              </p>
+      {/* Cross-sell CravBarrels */}
+      <section className="py-12 bg-gradient-to-r from-amber-900/20 to-orange-900/20 border-y border-amber-800/30">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-amber-600 to-orange-600 rounded-2xl flex items-center justify-center text-3xl">
+                🥃
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white">Also Collect Spirits?</h3>
+                <p className="text-gray-400">Try CravBarrels - Track your whiskey & spirits collection</p>
+              </div>
             </div>
-            <Link 
-              href="https://cravbarrels.com" 
+            <Link
+              href="https://cravbarrels.com"
               target="_blank"
-              className="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg transition whitespace-nowrap"
+              className="px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg transition"
             >
-              Explore CravBarrels
+              Explore CravBarrels →
             </Link>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-purple-900/30 py-12">
+      <footer className="py-12 border-t border-gray-800">
         <div className="max-w-7xl mx-auto px-4">
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <span className="text-2xl">🎴</span>
-                <span className="text-xl font-bold text-purple-400">CravCards</span>
+                <span className="text-xl font-bold text-white">CravCards</span>
               </div>
-              <p className="text-gray-500 text-sm">
-                The ultimate platform for card collectors of all types.
+              <p className="text-gray-400 text-sm">
+                Part of the CR AudioViz AI ecosystem.
               </p>
             </div>
             
             <div>
               <h4 className="font-semibold text-white mb-4">Product</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><Link href="/collection" className="hover:text-white transition">Collection</Link></li>
-                <li><Link href="/marketplace" className="hover:text-white transition">Marketplace</Link></li>
-                <li><Link href="/trivia" className="hover:text-white transition">Trivia</Link></li>
-                <li><Link href="/pricing" className="hover:text-white transition">Pricing</Link></li>
+              <ul className="space-y-2 text-gray-400 text-sm">
+                <li><Link href="/collection" className="hover:text-white">My Collection</Link></li>
+                <li><Link href="/marketplace" className="hover:text-white">Marketplace</Link></li>
+                <li><Link href="/trivia" className="hover:text-white">Daily Trivia</Link></li>
+                <li><Link href="/clubs" className="hover:text-white">Collector Clubs</Link></li>
               </ul>
             </div>
             
             <div>
               <h4 className="font-semibold text-white mb-4">Card Types</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><Link href="/collection?type=sports" className="hover:text-white transition">Sports Cards</Link></li>
-                <li><Link href="/collection?type=pokemon" className="hover:text-white transition">Pokémon</Link></li>
-                <li><Link href="/collection?type=mtg" className="hover:text-white transition">Magic: The Gathering</Link></li>
-                <li><Link href="/collection?type=yugioh" className="hover:text-white transition">Yu-Gi-Oh!</Link></li>
+              <ul className="space-y-2 text-gray-400 text-sm">
+                <li><Link href="/collection?type=sports" className="hover:text-white">Sports Cards</Link></li>
+                <li><Link href="/collection?type=pokemon" className="hover:text-white">Pokémon</Link></li>
+                <li><Link href="/collection?type=mtg" className="hover:text-white">Magic: The Gathering</Link></li>
+                <li><Link href="/collection?type=entertainment" className="hover:text-white">Entertainment</Link></li>
               </ul>
             </div>
             
             <div>
               <h4 className="font-semibold text-white mb-4">Company</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><Link href="https://craudiovizai.com" className="hover:text-white transition">CR AudioViz AI</Link></li>
-                <li><Link href="https://cravbarrels.com" className="hover:text-white transition">CravBarrels</Link></li>
-                <li><Link href="/terms" className="hover:text-white transition">Terms of Service</Link></li>
-                <li><Link href="/privacy" className="hover:text-white transition">Privacy Policy</Link></li>
+              <ul className="space-y-2 text-gray-400 text-sm">
+                <li><Link href="https://craudiovizai.com" className="hover:text-white">CR AudioViz AI</Link></li>
+                <li><Link href="/pricing" className="hover:text-white">Pricing</Link></li>
+                <li><Link href="/privacy" className="hover:text-white">Privacy Policy</Link></li>
+                <li><Link href="/terms" className="hover:text-white">Terms of Service</Link></li>
               </ul>
             </div>
           </div>
           
-          <div className="border-t border-purple-900/30 pt-8 text-center text-gray-500 text-sm">
-            <p>© 2025 CR AudioViz AI, LLC. All rights reserved.</p>
+          <div className="pt-8 border-t border-gray-800 text-center text-gray-500 text-sm">
+            © 2025 CR AudioViz AI, LLC. Part of the CRAV ecosystem.
           </div>
         </div>
       </footer>
