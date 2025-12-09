@@ -1,3 +1,11 @@
-# Deploy trigger - Auth fix
-Last: 2025-12-09T04:37:18Z
-All pages now use AuthProvider for consistent auth state.
+# Auth fix complete - 2025-12-09T21:05:11Z
+All pages now use AuthProvider:
+- Add Card
+- Import  
+- Scan
+- Clubs Create
+- Marketplace Create
+- Settings
+- Achievements
+
+No more redirect loops!
