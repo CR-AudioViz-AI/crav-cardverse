@@ -2,11 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useAuth } from '@/components/AuthProvider'
 import {
   Search,
-  Filter,
   Grid3X3,
   List,
   Heart,
@@ -14,7 +13,6 @@ import {
   TrendingUp,
   DollarSign,
   Tag,
-  Clock,
   ChevronDown,
   Plus,
   Loader2,
@@ -78,6 +76,7 @@ const SORT_OPTIONS = [
 
 export default function MarketplacePage() {
   const supabase = createClientComponentClient()
+  const { user, loading: authLoading } = useAuth()
   
   // State
   const [listings, setListings] = useState<Listing[]>([])
@@ -88,7 +87,6 @@ export default function MarketplacePage() {
     avgPrice: 0,
   })
   const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
   
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
@@ -96,16 +94,6 @@ export default function MarketplacePage() {
   const [rarity, setRarity] = useState('all')
   const [sortBy, setSortBy] = useState('newest')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [priceRange, setPriceRange] = useState({ min: '', max: '' })
-
-  // Fetch user
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-    }
-    getUser()
-  }, [supabase])
 
   // Fetch listings
   useEffect(() => {
@@ -127,14 +115,6 @@ export default function MarketplacePage() {
         
         if (searchQuery) {
           query = query.ilike('title', `%${searchQuery}%`)
-        }
-        
-        if (priceRange.min) {
-          query = query.gte('price', parseFloat(priceRange.min))
-        }
-        
-        if (priceRange.max) {
-          query = query.lte('price', parseFloat(priceRange.max))
         }
         
         // Apply sorting
@@ -171,7 +151,6 @@ export default function MarketplacePage() {
         }
       } catch (error) {
         console.error('Error fetching listings:', error)
-        // If no database yet, show empty state
         setListings([])
       } finally {
         setLoading(false)
@@ -179,12 +158,11 @@ export default function MarketplacePage() {
     }
     
     fetchListings()
-  }, [supabase, category, searchQuery, sortBy, priceRange])
+  }, [supabase, category, searchQuery, sortBy])
 
   // Toggle favorite
   const toggleFavorite = async (listingId: string) => {
     if (!user) {
-      // Redirect to login
       window.location.href = '/auth/login?redirect=/marketplace'
       return
     }
@@ -321,7 +299,7 @@ export default function MarketplacePage() {
               </button>
             </div>
 
-            {/* Sell Button */}
+            {/* Sell Button - Only show if logged in */}
             {user && (
               <Link
                 href="/marketplace/create"
@@ -472,8 +450,8 @@ export default function MarketplacePage() {
           </div>
         )}
 
-        {/* CTA for non-users */}
-        {!user && !loading && (
+        {/* CTA for non-users - Only show if NOT logged in */}
+        {!authLoading && !user && !loading && (
           <div className="mt-12 text-center bg-gradient-to-r from-purple-900/50 to-pink-900/50 rounded-2xl p-8 border border-purple-500/30">
             <h3 className="text-2xl font-bold text-white mb-2">Ready to Start Trading?</h3>
             <p className="text-gray-400 mb-6">Create an account to buy, sell, and trade cards with collectors worldwide.</p>
