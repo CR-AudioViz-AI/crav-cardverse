@@ -1,4 +1,3 @@
-# Auto-deploy trigger
-Last triggered: 2025-12-09T03:43:44Z
-
-This file forces Vercel to redeploy when changes are pushed.
+# Deploy trigger - Auth fix
+Last: 2025-12-09T04:37:18Z
+All pages now use AuthProvider for consistent auth state.
