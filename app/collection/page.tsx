@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useAuth } from '@/components/AuthProvider'
 import {
   Search,
   Plus,
@@ -72,8 +73,8 @@ const SORT_OPTIONS = [
 export default function CollectionPage() {
   const router = useRouter()
   const supabase = createClientComponentClient()
+  const { user, loading: authLoading } = useAuth()
   
-  const [user, setUser] = useState<any>(null)
   const [cards, setCards] = useState<Card[]>([])
   const [stats, setStats] = useState<CollectionStats>({
     totalCards: 0,
@@ -92,23 +93,16 @@ export default function CollectionPage() {
   // Modal
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
 
-  // Check auth and fetch cards
+  // Fetch cards when user is available
   useEffect(() => {
-    const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) {
-        // Show public collection view or redirect
-        setLoading(false)
-        return
-      }
-      
-      setUser(user)
-      await fetchCards(user.id)
-    }
+    if (authLoading) return
     
-    init()
-  }, [supabase])
+    if (user) {
+      fetchCards(user.id)
+    } else {
+      setLoading(false)
+    }
+  }, [user, authLoading, category, sortBy, searchQuery])
 
   const fetchCards = async (userId: string) => {
     setLoading(true)
@@ -176,14 +170,8 @@ export default function CollectionPage() {
     }
   }
 
-  // Re-fetch when filters change
-  useEffect(() => {
-    if (user) {
-      fetchCards(user.id)
-    }
-  }, [category, sortBy, searchQuery])
-
   const deleteCard = async (cardId: string) => {
+    if (!user) return
     if (!confirm('Are you sure you want to delete this card?')) return
     
     try {
@@ -202,11 +190,20 @@ export default function CollectionPage() {
     }
   }
 
-  // Not logged in view
-  if (!loading && !user) {
+  // Loading state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+      </div>
+    )
+  }
+
+  // Not logged in - show proper logged-out view
+  if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 py-8">
-        <div className="max-w-4xl mx-auto px-4 text-center">
+        <div className="max-w-4xl mx-auto px-4 text-center pt-20">
           <Package className="w-20 h-20 text-gray-600 mx-auto mb-6" />
           <h1 className="text-3xl font-bold text-white mb-4">Your Collection Awaits</h1>
           <p className="text-gray-400 mb-8 max-w-lg mx-auto">
@@ -231,6 +228,7 @@ export default function CollectionPage() {
     )
   }
 
+  // User IS logged in - show collection
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 py-8">
       <div className="max-w-7xl mx-auto px-4">
@@ -382,7 +380,7 @@ export default function CollectionPage() {
           </div>
         )}
 
-        {/* Empty State */}
+        {/* Empty State - User is logged in but has no cards */}
         {!loading && cards.length === 0 && (
           <div className="text-center py-20 bg-gray-900/30 rounded-2xl border border-gray-800">
             <Package className="w-16 h-16 text-gray-600 mx-auto mb-4" />
