@@ -1,501 +1,368 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import {
-  LayoutDashboard,
-  Layers,
-  Trophy,
-  Users,
-  GraduationCap,
-  Landmark,
-  Camera,
-  ShoppingCart,
-  Settings,
-  Bot,
-  Sparkles,
-  TrendingUp,
-  TrendingDown,
-  Star,
-  Zap,
-  Target,
-  Gift,
-  Search,
-  Bell,
-  Menu,
-  X,
-  ChevronRight,
-  Crown,
-  Flame,
-  Shield,
-  Award,
-  Gamepad2,
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Input } from '@/components/ui/input'
+import Link from 'next/link';
+import { 
+  Sparkles, Trophy, Users, Gamepad2, Store, Shield, 
+  TrendingUp, Star, ArrowRight, Check, Zap, Crown,
+  CreditCard
+} from 'lucide-react';
 
-// Sample data for demonstration
-const COLLECTION_STATS = {
-  total_cards: 1247,
-  total_value: 45892.50,
-  total_invested: 28450.00,
-  profit: 17442.50,
-  roi: 61.3,
-  cards_added_this_week: 12,
-  value_change_week: 2340.00,
-  value_change_percent: 5.4,
-}
+const cardCategories = [
+  {
+    name: 'Sports Cards',
+    description: 'Baseball, Football, Basketball, Hockey, Soccer',
+    emoji: '⚾',
+    examples: ['Topps', 'Panini', 'Upper Deck', 'Bowman'],
+    color: 'from-red-600 to-orange-600',
+  },
+  {
+    name: 'Trading Card Games',
+    description: 'Pokémon, Magic, Yu-Gi-Oh!, One Piece',
+    emoji: '🎴',
+    examples: ['Pokémon TCG', 'Magic: The Gathering', 'Yu-Gi-Oh!', 'Dragon Ball'],
+    color: 'from-yellow-500 to-amber-600',
+  },
+  {
+    name: 'Entertainment',
+    description: 'Movies, TV Shows, Music, Wrestling',
+    emoji: '🎬',
+    examples: ['Star Wars', 'Marvel', 'WWE', 'Disney'],
+    color: 'from-blue-600 to-cyan-600',
+  },
+  {
+    name: 'Gaming Cards',
+    description: 'Video game collectibles and promos',
+    emoji: '🎮',
+    examples: ['Fortnite', 'Minecraft', 'Xbox', 'PlayStation'],
+    color: 'from-green-600 to-emerald-600',
+  },
+  {
+    name: 'Non-Sport Cards',
+    description: 'History, Science, Art, Nature',
+    emoji: '🌍',
+    examples: ['Garbage Pail Kids', 'Wacky Packages', 'Historical', 'Nature'],
+    color: 'from-purple-600 to-pink-600',
+  },
+  {
+    name: 'Vintage & Rare',
+    description: 'Pre-1980 classics and graded cards',
+    emoji: '💎',
+    examples: ['T206', 'Goudey', 'Bowman 1950s', 'PSA Graded'],
+    color: 'from-amber-700 to-yellow-600',
+  },
+];
 
-const TOP_CARDS = [
-  { id: '1', name: '1st Edition Charizard', set: 'Base Set', grade: 'PSA 9', value: 12500, change: 8.2, category: 'pokemon', image: '🔥' },
-  { id: '2', name: 'Black Lotus', set: 'Alpha', grade: 'BGS 8.5', value: 8900, change: -2.1, category: 'mtg', image: '🌸' },
-  { id: '3', name: 'Mickey Mantle RC', set: '1952 Topps', grade: 'PSA 6', value: 7200, change: 5.5, category: 'sports', image: '⚾' },
-  { id: '4', name: 'Blue-Eyes White Dragon', set: 'LOB-001', grade: 'PSA 10', value: 4500, change: 12.3, category: 'yugioh', image: '🐉' },
-  { id: '5', name: 'LeBron James RC', set: '2003 Topps Chrome', grade: 'PSA 10', value: 3800, change: -1.8, category: 'sports', image: '🏀' },
-]
+const features = [
+  {
+    icon: CreditCard,
+    title: 'Unlimited Collection Types',
+    description: 'Track ANY type of card - sports, Pokémon, MTG, entertainment, and more.',
+  },
+  {
+    icon: TrendingUp,
+    title: 'Value Tracking',
+    description: 'Monitor your collection\'s worth with market price integration.',
+  },
+  {
+    icon: Store,
+    title: 'Trading Marketplace',
+    description: 'Buy, sell, and trade with collectors worldwide.',
+  },
+  {
+    icon: Gamepad2,
+    title: 'Daily Trivia',
+    description: 'Test your knowledge and earn XP rewards every day.',
+  },
+  {
+    icon: Trophy,
+    title: 'Achievements',
+    description: 'Unlock badges as you grow your collection.',
+  },
+  {
+    icon: Users,
+    title: 'Collector Clubs',
+    description: 'Join communities of like-minded collectors.',
+  },
+];
 
-const RECENT_ACTIVITY = [
-  { type: 'add', message: 'Added 3 Pokémon cards to collection', time: '2 hours ago', icon: '➕' },
-  { type: 'price', message: 'Charizard VMAX increased 15%', time: '5 hours ago', icon: '📈' },
-  { type: 'badge', message: 'Earned "Century Collector" badge', time: '1 day ago', icon: '🏆' },
-  { type: 'club', message: 'Joined "Vintage Baseball" club', time: '2 days ago', icon: '👥' },
-  { type: 'trivia', message: 'Completed MTG History quiz - 95%', time: '3 days ago', icon: '🎯' },
-]
-
-const CLUBS_PREVIEW = [
-  { name: 'Braggers Club', members: 245, icon: '👑', requirement: '$10K+ collection' },
-  { name: 'Reds Fan Club', members: 1832, icon: '⚾', requirement: 'Open to all' },
-  { name: 'PSA 10 Hunters', members: 567, icon: '💎', requirement: 'Own 5+ PSA 10s' },
-  { name: 'MTG Commander', members: 3421, icon: '⚔️', requirement: 'Open to all' },
-]
-
-const ACHIEVEMENTS = [
-  { name: 'First Card', icon: '🎴', earned: true },
-  { name: 'Century Club', icon: '💯', earned: true },
-  { name: 'Graded Guru', icon: '📊', earned: true },
-  { name: 'Trivia Master', icon: '🧠', earned: false },
-  { name: 'Club Leader', icon: '👑', earned: false },
-  { name: 'Trade Tycoon', icon: '🤝', earned: false },
-]
-
-const NAV_ITEMS = [
-  { name: 'Dashboard', icon: LayoutDashboard, href: '/', active: true },
-  { name: 'Collection', icon: Layers, href: '/collection' },
-  { name: 'Scanner', icon: Camera, href: '/scanner' },
-  { name: 'Clubs', icon: Users, href: '/clubs' },
-  { name: 'Trivia', icon: Gamepad2, href: '/trivia' },
-  { name: 'Academy', icon: GraduationCap, href: '/academy' },
-  { name: 'Museum', icon: Landmark, href: '/museum' },
-  { name: 'Marketplace', icon: ShoppingCart, href: '/marketplace' },
-  { name: 'Javari AI', icon: Bot, href: '/javari' },
-]
-
-export default function Dashboard() {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-
+export default function HomePage() {
   return (
-    <div className="min-h-screen bg-background">
-      {/* Sidebar */}
-      <AnimatePresence>
-        {sidebarOpen && (
-          <motion.aside
-            initial={{ x: -280 }}
-            animate={{ x: 0 }}
-            exit={{ x: -280 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed left-0 top-0 z-40 h-screen w-72 border-r bg-card"
-          >
-            {/* Logo */}
-            <div className="flex h-16 items-center justify-between border-b px-6">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                    <Sparkles className="h-6 w-6 text-white" />
-                  </div>
-                  <div className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-green-500 border-2 border-card" />
-                </div>
-                <div>
-                  <h1 className="font-display text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                    CravCards
-                  </h1>
-                  <p className="text-xs text-muted-foreground">Pro Collector</p>
-                </div>
-              </div>
-              <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)} className="lg:hidden">
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-
-            {/* Navigation */}
-            <nav className="p-4 space-y-1">
-              {NAV_ITEMS.map((item) => (
-                <a
-                  key={item.name}
-                  href={item.href}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                    item.active
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  }`}
-                >
-                  <item.icon className="h-5 w-5" />
-                  <span className="font-medium">{item.name}</span>
-                  {item.name === 'Javari AI' && (
-                    <Badge variant="secondary" className="ml-auto text-xs">AI</Badge>
-                  )}
-                </a>
-              ))}
+    <div className="min-h-screen bg-gradient-to-b from-indigo-950 via-purple-950 to-black">
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b border-purple-900/30 bg-black/50 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <Link href="/" className="flex items-center gap-2">
+              <span className="text-3xl">🎴</span>
+              <span className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                CravCards
+              </span>
+            </Link>
+            
+            <nav className="hidden md:flex items-center gap-8">
+              <Link href="/collection" className="text-gray-300 hover:text-white transition">
+                Collection
+              </Link>
+              <Link href="/marketplace" className="text-gray-300 hover:text-white transition">
+                Marketplace
+              </Link>
+              <Link href="/trivia" className="text-gray-300 hover:text-white transition">
+                Trivia
+              </Link>
+              <Link href="/clubs" className="text-gray-300 hover:text-white transition">
+                Clubs
+              </Link>
+              <Link href="/pricing" className="text-gray-300 hover:text-white transition">
+                Pricing
+              </Link>
             </nav>
-
-            {/* User Level Progress */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-card">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center">
-                  <Crown className="h-5 w-5 text-white" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">Level 24</span>
-                    <span className="text-xs text-muted-foreground">3,450 / 5,000 XP</span>
-                  </div>
-                  <Progress value={69} className="h-2 mt-1" />
-                </div>
-              </div>
-              <Button className="w-full" variant="outline" size="sm">
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </Button>
-            </div>
-          </motion.aside>
-        )}
-      </AnimatePresence>
-
-      {/* Main Content */}
-      <main className={`transition-all duration-300 ${sidebarOpen ? 'lg:ml-72' : ''}`}>
-        {/* Header */}
-        <header className="sticky top-0 z-30 h-16 border-b bg-background/80 backdrop-blur-lg">
-          <div className="flex h-full items-center justify-between px-6">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(!sidebarOpen)}>
-                <Menu className="h-5 w-5" />
-              </Button>
-              <div className="relative w-96 hidden md:block">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search cards, sets, players..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-muted border-0"
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-xs flex items-center justify-center text-white">
-                  3
-                </span>
-              </Button>
-              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
-                RH
-              </div>
+            
+            <div className="flex items-center gap-3">
+              <Link 
+                href="/auth/login" 
+                className="text-gray-300 hover:text-white transition px-4 py-2"
+              >
+                Sign In
+              </Link>
+              <Link 
+                href="/auth/signup" 
+                className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition"
+              >
+                Get Started Free
+              </Link>
             </div>
           </div>
-        </header>
+        </div>
+      </header>
 
-        {/* Dashboard Content */}
-        <div className="p-6 space-y-6">
-          {/* Welcome Banner */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 p-8"
-          >
-            <div className="relative z-10">
-              <h2 className="text-3xl font-display font-bold text-white mb-2">
-                Welcome back, Roy! 👋
-              </h2>
-              <p className="text-white/80 max-w-xl">
-                Your collection is up {COLLECTION_STATS.value_change_percent}% this week. 
-                You have 3 cards that might be good to sell at peak value.
-              </p>
-              <div className="flex gap-3 mt-4">
-                <Button className="bg-white text-purple-600 hover:bg-white/90">
-                  <Camera className="h-4 w-4 mr-2" />
-                  Scan Card
-                </Button>
-                <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
-                  View Insights
-                </Button>
-              </div>
-            </div>
-            <div className="absolute right-8 top-1/2 -translate-y-1/2 text-9xl opacity-20">
-              🎴
-            </div>
-          </motion.div>
+      {/* Hero Section */}
+      <section className="relative py-20 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-900/30 via-transparent to-transparent" />
+        
+        <div className="max-w-7xl mx-auto px-4 text-center relative">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-900/50 border border-purple-700/50 rounded-full text-purple-300 text-sm mb-6">
+            <Sparkles className="w-4 h-4" />
+            Track Any Card Collection
+          </div>
+          
+          <h1 className="text-5xl md:text-7xl font-bold text-white mb-6">
+            Your Cards.<br />
+            <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
+              Your Collection.
+            </span>
+          </h1>
+          
+          <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-8">
+            The ultimate platform for card collectors. Track sports cards, Pokémon, 
+            Magic: The Gathering, and any collectible cards in one beautiful app.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link 
+              href="/auth/signup"
+              className="px-8 py-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition flex items-center justify-center gap-2"
+            >
+              Start Collecting Free
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+            <Link 
+              href="/pricing"
+              className="px-8 py-4 bg-purple-900/50 hover:bg-purple-900/70 text-purple-300 font-semibold rounded-xl border border-purple-700/50 transition"
+            >
+              View Pricing
+            </Link>
+          </div>
+          
+          <p className="text-gray-500 text-sm mt-4">
+            Free plan includes 50 cards • No credit card required
+          </p>
+        </div>
+      </section>
 
-          {/* Stats Grid */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                title: 'Total Collection Value',
-                value: `$${COLLECTION_STATS.total_value.toLocaleString()}`,
-                change: `+$${COLLECTION_STATS.value_change_week.toLocaleString()}`,
-                changePercent: COLLECTION_STATS.value_change_percent,
-                icon: TrendingUp,
-                color: 'from-green-500 to-emerald-500',
-              },
-              {
-                title: 'Total Cards',
-                value: COLLECTION_STATS.total_cards.toLocaleString(),
-                change: `+${COLLECTION_STATS.cards_added_this_week} this week`,
-                icon: Layers,
-                color: 'from-blue-500 to-cyan-500',
-              },
-              {
-                title: 'Portfolio ROI',
-                value: `${COLLECTION_STATS.roi}%`,
-                change: `$${COLLECTION_STATS.profit.toLocaleString()} profit`,
-                icon: Target,
-                color: 'from-purple-500 to-pink-500',
-              },
-              {
-                title: 'Collector Level',
-                value: 'Level 24',
-                change: '1,550 XP to next level',
-                icon: Award,
-                color: 'from-yellow-500 to-orange-500',
-              },
-            ].map((stat, index) => (
-              <motion.div
-                key={stat.title}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
+      {/* Card Categories Section */}
+      <section className="py-20">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+              Collect <span className="text-purple-400">Any Type</span> of Card
+            </h2>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+              From vintage sports cards to the latest Pokémon releases, CravCards supports every collecting hobby.
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {cardCategories.map((category) => (
+              <div 
+                key={category.name}
+                className="group bg-purple-900/20 border border-purple-700/30 rounded-xl p-6 hover:border-purple-500/50 transition-all hover:scale-[1.02]"
               >
-                <Card className="relative overflow-hidden">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground">{stat.title}</p>
-                        <p className="text-3xl font-bold mt-1">{stat.value}</p>
-                        <p className="text-sm text-green-400 mt-1 flex items-center gap-1">
-                          {stat.changePercent && <TrendingUp className="h-3 w-3" />}
-                          {stat.change}
-                        </p>
-                      </div>
-                      <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center`}>
-                        <stat.icon className="h-6 w-6 text-white" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
+                <div className={`inline-flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br ${category.color} mb-4`}>
+                  <span className="text-2xl">{category.emoji}</span>
+                </div>
+                
+                <h3 className="text-xl font-semibold text-white mb-2">{category.name}</h3>
+                <p className="text-gray-400 text-sm mb-4">{category.description}</p>
+                
+                <div className="flex flex-wrap gap-2">
+                  {category.examples.map((example) => (
+                    <span 
+                      key={example}
+                      className="px-2 py-1 bg-purple-900/50 text-purple-300 text-xs rounded-md"
+                    >
+                      {example}
+                    </span>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
-
-          {/* Main Grid */}
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Top Cards */}
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Top Value Cards</CardTitle>
-                    <CardDescription>Your most valuable cards by current market price</CardDescription>
-                  </div>
-                  <Button variant="outline" size="sm">View All</Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {TOP_CARDS.map((card, index) => (
-                    <motion.div
-                      key={card.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      className="flex items-center gap-4 p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
-                    >
-                      <div className="text-3xl">{card.image}</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium truncate">{card.name}</p>
-                          <Badge variant={card.category as any} className="text-xs">
-                            {card.category}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <span>{card.set}</span>
-                          <span>•</span>
-                          <span className="text-yellow-500">{card.grade}</span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold">${card.value.toLocaleString()}</p>
-                        <p className={`text-sm flex items-center gap-1 ${card.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {card.change >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                          {card.change >= 0 ? '+' : ''}{card.change}%
-                        </p>
-                      </div>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                    </motion.div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Recent Activity */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Your latest collection updates</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {RECENT_ACTIVITY.map((activity, index) => (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      className="flex items-start gap-3"
-                    >
-                      <div className="text-xl">{activity.icon}</div>
-                      <div className="flex-1">
-                        <p className="text-sm">{activity.message}</p>
-                        <p className="text-xs text-muted-foreground">{activity.time}</p>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Clubs & Achievements */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Clubs Preview */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="h-5 w-5" />
-                      Your Clubs
-                    </CardTitle>
-                    <CardDescription>Connect with fellow collectors</CardDescription>
-                  </div>
-                  <Button variant="outline" size="sm">Browse Clubs</Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {CLUBS_PREVIEW.map((club, index) => (
-                    <motion.div
-                      key={club.name}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: index * 0.1 }}
-                      className="p-4 rounded-xl bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="text-2xl">{club.icon}</div>
-                        <div>
-                          <p className="font-medium">{club.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {club.members.toLocaleString()} members
-                          </p>
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-2">{club.requirement}</p>
-                    </motion.div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Achievements */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Trophy className="h-5 w-5" />
-                      Achievements
-                    </CardTitle>
-                    <CardDescription>3 of 6 earned • 150 XP available</CardDescription>
-                  </div>
-                  <Button variant="outline" size="sm">View All</Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-4">
-                  {ACHIEVEMENTS.map((achievement, index) => (
-                    <motion.div
-                      key={achievement.name}
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: index * 0.1 }}
-                      className={`flex flex-col items-center p-4 rounded-xl ${
-                        achievement.earned 
-                          ? 'bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border border-yellow-500/30' 
-                          : 'bg-muted/50 opacity-50'
-                      }`}
-                    >
-                      <div className="text-3xl mb-2">{achievement.icon}</div>
-                      <p className="text-xs text-center font-medium">{achievement.name}</p>
-                      {achievement.earned && (
-                        <Badge variant="secondary" className="mt-2 text-xs">Earned</Badge>
-                      )}
-                    </motion.div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Jump into CravCards features</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {[
-                  { name: 'Scan Card', icon: Camera, color: 'from-purple-500 to-pink-500', description: 'AI-powered card recognition' },
-                  { name: 'Play Trivia', icon: Gamepad2, color: 'from-blue-500 to-cyan-500', description: 'Test your card knowledge' },
-                  { name: 'Ask Javari', icon: Bot, color: 'from-green-500 to-emerald-500', description: 'Your AI card expert' },
-                  { name: 'Card Academy', icon: GraduationCap, color: 'from-orange-500 to-red-500', description: 'Learn from experts' },
-                ].map((action, index) => (
-                  <motion.div
-                    key={action.name}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="group cursor-pointer"
-                  >
-                    <div className="p-6 rounded-xl bg-muted/50 hover:bg-muted transition-all group-hover:scale-[1.02]">
-                      <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${action.color} flex items-center justify-center mb-4`}>
-                        <action.icon className="h-6 w-6 text-white" />
-                      </div>
-                      <h3 className="font-medium mb-1">{action.name}</h3>
-                      <p className="text-sm text-muted-foreground">{action.description}</p>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
         </div>
-      </main>
-    </div>
-  )
-}
+      </section>
 
+      {/* Features Section */}
+      <section className="py-20 bg-purple-950/30">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+              Everything You Need to <span className="text-purple-400">Collect</span>
+            </h2>
+            <p className="text-gray-400 text-lg">
+              Powerful features designed for serious collectors
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {features.map((feature) => {
+              const Icon = feature.icon;
+              return (
+                <div key={feature.title} className="flex gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 bg-purple-600/20 rounded-xl flex items-center justify-center">
+                    <Icon className="w-6 h-6 text-purple-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white mb-1">{feature.title}</h3>
+                    <p className="text-gray-400 text-sm">{feature.description}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-20">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 border border-purple-500/30 rounded-2xl p-8 md:p-12 text-center">
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+              Ready to Start Your Collection?
+            </h2>
+            <p className="text-gray-300 text-lg mb-8 max-w-xl mx-auto">
+              Join thousands of collectors tracking their cards on CravCards. 
+              Free to start, powerful enough to scale.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-6">
+              <Link 
+                href="/auth/signup"
+                className="px-8 py-4 bg-white text-purple-900 font-semibold rounded-xl transition hover:bg-gray-100 flex items-center justify-center gap-2"
+              >
+                <Zap className="w-5 h-5" />
+                Create Free Account
+              </Link>
+            </div>
+            
+            <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-400">
+              <span className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-400" />
+                50 cards free
+              </span>
+              <span className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-400" />
+                No credit card
+              </span>
+              <span className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-400" />
+                Upgrade anytime
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Cross-Sell Banner */}
+      <section className="py-10 border-t border-purple-900/30">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="bg-gradient-to-r from-amber-900/30 to-amber-800/30 border border-amber-700/30 rounded-xl p-6 flex flex-col md:flex-row items-center gap-6">
+            <div className="text-4xl">🥃</div>
+            <div className="flex-1 text-center md:text-left">
+              <h3 className="text-lg font-semibold text-amber-100">Also collect spirits?</h3>
+              <p className="text-amber-200/70 text-sm">
+                Try CravBarrels - track your whiskey, bourbon, and spirits collection!
+              </p>
+            </div>
+            <Link 
+              href="https://cravbarrels.com" 
+              target="_blank"
+              className="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg transition whitespace-nowrap"
+            >
+              Explore CravBarrels
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-purple-900/30 py-12">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="grid md:grid-cols-4 gap-8 mb-8">
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-2xl">🎴</span>
+                <span className="text-xl font-bold text-purple-400">CravCards</span>
+              </div>
+              <p className="text-gray-500 text-sm">
+                The ultimate platform for card collectors of all types.
+              </p>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold text-white mb-4">Product</h4>
+              <ul className="space-y-2 text-sm text-gray-400">
+                <li><Link href="/collection" className="hover:text-white transition">Collection</Link></li>
+                <li><Link href="/marketplace" className="hover:text-white transition">Marketplace</Link></li>
+                <li><Link href="/trivia" className="hover:text-white transition">Trivia</Link></li>
+                <li><Link href="/pricing" className="hover:text-white transition">Pricing</Link></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold text-white mb-4">Card Types</h4>
+              <ul className="space-y-2 text-sm text-gray-400">
+                <li><Link href="/collection?type=sports" className="hover:text-white transition">Sports Cards</Link></li>
+                <li><Link href="/collection?type=pokemon" className="hover:text-white transition">Pokémon</Link></li>
+                <li><Link href="/collection?type=mtg" className="hover:text-white transition">Magic: The Gathering</Link></li>
+                <li><Link href="/collection?type=yugioh" className="hover:text-white transition">Yu-Gi-Oh!</Link></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold text-white mb-4">Company</h4>
+              <ul className="space-y-2 text-sm text-gray-400">
+                <li><Link href="https://craudiovizai.com" className="hover:text-white transition">CR AudioViz AI</Link></li>
+                <li><Link href="https://cravbarrels.com" className="hover:text-white transition">CravBarrels</Link></li>
+                <li><Link href="/terms" className="hover:text-white transition">Terms of Service</Link></li>
+                <li><Link href="/privacy" className="hover:text-white transition">Privacy Policy</Link></li>
+              </ul>
+            </div>
+          </div>
+          
+          <div className="border-t border-purple-900/30 pt-8 text-center text-gray-500 text-sm">
+            <p>© 2025 CR AudioViz AI, LLC. All rights reserved.</p>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
