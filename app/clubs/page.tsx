@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { motion } from 'framer-motion'
 import {
   Users,
@@ -192,10 +193,12 @@ export default function ClubsPage() {
               Join communities of collectors who share your passion
             </p>
           </div>
-          <Button className="bg-gradient-to-r from-purple-500 to-pink-500">
-            <Plus className="h-4 w-4 mr-2" />
-            Create Club
-          </Button>
+          <Link href="/clubs/create">
+            <Button className="bg-gradient-to-r from-purple-500 to-pink-500">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Club
+            </Button>
+          </Link>
         </div>
 
         {/* Search and Filters */}
@@ -354,13 +357,17 @@ export default function ClubsPage() {
               Create a community around your favorite team, player, set, or collecting style. 
               Lead discussions, organize meetups, and build your collector network.
             </p>
-            <Button size="lg" className="bg-gradient-to-r from-purple-500 to-pink-500">
-              <Plus className="h-5 w-5 mr-2" />
-              Create Your Club
-            </Button>
+            <Link href="/clubs/create">
+              <Button size="lg" className="bg-gradient-to-r from-purple-500 to-pink-500">
+                <Plus className="h-5 w-5 mr-2" />
+                Create Your Club
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>
     </div>
   )
 }
+
+
