@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Check, Sparkles, Zap, Crown, Star, CreditCard } from 'lucide-react';
+import { Check, Zap, Crown, Star, CreditCard, AlertCircle, Info } from 'lucide-react';
 
 const plans = [
   {
@@ -130,7 +130,7 @@ export default function PricingPage() {
         </div>
 
         {/* Billing Toggle */}
-        <div className="flex items-center justify-center gap-4 mb-12">
+        <div className="flex items-center justify-center gap-4 mb-8">
           <span className={`text-sm ${!isAnnual ? 'text-white' : 'text-gray-500'}`}>Monthly</span>
           <button
             onClick={() => setIsAnnual(!isAnnual)}
@@ -149,13 +149,14 @@ export default function PricingPage() {
           </span>
         </div>
 
-        {/* Payment Method */}
+        {/* Payment Method Toggle */}
         <div className="flex items-center justify-center gap-4 mb-12">
+          <span className="text-gray-400 text-sm mr-2">Pay with:</span>
           <button
             onClick={() => setPaymentMethod('stripe')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium transition ${
               paymentMethod === 'stripe'
-                ? 'bg-purple-600 text-white'
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
                 : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
             }`}
           >
@@ -164,13 +165,16 @@ export default function PricingPage() {
           </button>
           <button
             onClick={() => setPaymentMethod('paypal')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium transition ${
               paymentMethod === 'paypal'
-                ? 'bg-purple-600 text-white'
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
                 : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
             }`}
           >
-            <span className="font-bold text-sm">PayPal</span>
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944 2.997c.06-.369.39-.641.762-.641h7.108c2.358 0 4.086.651 5.142 1.935.97 1.182 1.277 2.727.962 4.856-.338 2.274-1.277 4.005-2.793 5.148-1.399 1.054-3.307 1.589-5.67 1.589h-1.19c-.49 0-.882.33-.976.797l-.723 4.146c-.06.346-.366.606-.719.606H7.076zM17.043 6.526c-.255 1.712-.966 2.952-2.112 3.684-1.112.71-2.59 1.07-4.392 1.07h-.966c-.392 0-.711.27-.782.646l-.92 5.293c-.042.225.13.432.364.432h2.155c.345 0 .629-.236.697-.568l.029-.152.556-3.52.036-.195c.068-.332.352-.568.697-.568h.439c2.845 0 5.073-.958 5.723-3.734.271-1.16.13-2.127-.589-2.808-.22-.207-.49-.379-.8-.52l-.135-.06z"/>
+            </svg>
+            PayPal
           </button>
         </div>
 
@@ -246,25 +250,38 @@ export default function PricingPage() {
           })}
         </div>
 
+        {/* Important Policy Notice */}
+        <div className="mt-12 bg-gray-900/50 rounded-xl p-6 border border-gray-800 max-w-3xl mx-auto">
+          <div className="flex items-start gap-3">
+            <Info className="w-5 h-5 text-purple-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="text-white font-semibold mb-2">Downgrade Policy</h3>
+              <p className="text-gray-400 text-sm">
+                If you downgrade your plan, the change takes effect at your next renewal date. Your cards are never deleted - if you have more cards than your new plan allows, cards over the limit are simply hidden until you upgrade again or remove cards to fit within your plan&apos;s limit.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* FAQ Section */}
-        <div className="mt-20 text-center">
+        <div className="mt-16 text-center">
           <h2 className="text-2xl font-bold text-white mb-8">Frequently Asked Questions</h2>
           <div className="grid md:grid-cols-2 gap-6 text-left max-w-4xl mx-auto">
             <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
-              <h3 className="text-white font-semibold mb-2">Can I change plans later?</h3>
-              <p className="text-gray-400 text-sm">Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately.</p>
+              <h3 className="text-white font-semibold mb-2">Can I upgrade my plan?</h3>
+              <p className="text-gray-400 text-sm">Yes! Upgrades take effect immediately. You&apos;ll be charged a prorated amount for the remainder of your billing cycle.</p>
+            </div>
+            <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+              <h3 className="text-white font-semibold mb-2">What happens when I downgrade?</h3>
+              <p className="text-gray-400 text-sm">Downgrades take effect at your next renewal date. If you have more cards than your new plan allows, extra cards are hidden (not deleted) until you upgrade or remove cards.</p>
             </div>
             <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
               <h3 className="text-white font-semibold mb-2">What payment methods do you accept?</h3>
-              <p className="text-gray-400 text-sm">We accept all major credit cards through Stripe, as well as PayPal for your convenience.</p>
+              <p className="text-gray-400 text-sm">We accept all major credit cards (Visa, Mastercard, Amex, Discover) through Stripe, as well as PayPal.</p>
             </div>
             <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
-              <h3 className="text-white font-semibold mb-2">Is there a refund policy?</h3>
-              <p className="text-gray-400 text-sm">Yes, we offer a 30-day money-back guarantee on all paid plans. No questions asked.</p>
-            </div>
-            <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
-              <h3 className="text-white font-semibold mb-2">Do credits expire?</h3>
-              <p className="text-gray-400 text-sm">Never! Your credits never expire on paid plans. On free plans, unused credits roll over each month.</p>
+              <h3 className="text-white font-semibold mb-2">Can I cancel anytime?</h3>
+              <p className="text-gray-400 text-sm">Yes! You can cancel your subscription at any time. Your access continues until the end of your current billing period, then you&apos;ll be moved to the Free plan.</p>
             </div>
           </div>
         </div>
