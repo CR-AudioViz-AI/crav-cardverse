@@ -206,7 +206,8 @@ export async function POST(request: NextRequest) {
 // Free tier: 5,000 calls/day
 // ============================================================================
 
-export async function getEbayPrices(cardName: string, year?: string) {
+// Helper function - NOT exported (internal use only)
+async function getEbayPricesInternal(cardName: string, year?: string) {
   // Placeholder for eBay integration
   // Would return recent sold prices for valuation
   return {
