@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useAuth } from '@/components/AuthProvider'
 import {
@@ -12,34 +13,67 @@ import {
   Loader2,
   AlertCircle,
   Check,
+  Search,
+  X,
+  ChevronDown,
+  ImageIcon,
+  Sparkles,
 } from 'lucide-react'
 
+// Types for the card catalog
+interface CatalogCard {
+  id: string
+  name: string
+  slug: string
+  set_code: string
+  card_number: string
+  category: string
+  rarity: string
+  year_released: number
+  description: string
+  image_url: string
+  price_raw: number
+  price_psa_10: number
+  metadata: {
+    hp?: string
+    type?: string
+    attacks?: Array<{ name: string; damage: string }>
+    [key: string]: any
+  }
+  card_sets?: {
+    name: string
+    code: string
+  }
+}
+
+interface CardSet {
+  id: string
+  name: string
+  code: string
+  category: string
+  total_cards: number
+  release_year: number
+}
+
 const CATEGORIES = [
+  { id: 'all', name: 'All Categories', emoji: '📚' },
   { id: 'pokemon', name: 'Pokémon', emoji: '⚡' },
-  { id: 'sports', name: 'Sports Cards', emoji: '⚾' },
+  { id: 'sports_baseball', name: 'Baseball', emoji: '⚾' },
+  { id: 'sports_basketball', name: 'Basketball', emoji: '🏀' },
+  { id: 'sports_football', name: 'Football', emoji: '🏈' },
   { id: 'mtg', name: 'Magic: The Gathering', emoji: '⚔️' },
   { id: 'yugioh', name: 'Yu-Gi-Oh!', emoji: '🎴' },
   { id: 'disney', name: 'Disney', emoji: '🏰' },
   { id: 'entertainment', name: 'Entertainment', emoji: '🎬' },
-  { id: 'other', name: 'Other', emoji: '📦' },
-]
-
-const RARITIES = [
-  { id: 'common', name: 'Common' },
-  { id: 'uncommon', name: 'Uncommon' },
-  { id: 'rare', name: 'Rare' },
-  { id: 'epic', name: 'Epic' },
-  { id: 'legendary', name: 'Legendary' },
-  { id: 'mythic', name: 'Mythic' },
 ]
 
 const CONDITIONS = [
-  { id: 'mint', name: 'Mint' },
-  { id: 'near_mint', name: 'Near Mint' },
-  { id: 'excellent', name: 'Excellent' },
-  { id: 'good', name: 'Good' },
-  { id: 'fair', name: 'Fair' },
-  { id: 'poor', name: 'Poor' },
+  { id: 'mint', name: 'Mint', description: 'Perfect condition' },
+  { id: 'near_mint', name: 'Near Mint', description: 'Almost perfect' },
+  { id: 'excellent', name: 'Excellent', description: 'Minor wear' },
+  { id: 'good', name: 'Good', description: 'Visible wear' },
+  { id: 'fair', name: 'Fair', description: 'Significant wear' },
+  { id: 'poor', name: 'Poor', description: 'Heavy wear/damage' },
 ]
 
 const GRADING_COMPANIES = ['PSA', 'BGS', 'CGC', 'SGC']
@@ -49,17 +83,21 @@ export default function AddCardPage() {
   const supabase = createClientComponentClient()
   const { user, loading: authLoading } = useAuth()
   
+  // Search state
+  const [searchMode, setSearchMode] = useState<'search' | 'manual'>('search')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchCategory, setSearchCategory] = useState('all')
+  const [searchResults, setSearchResults] = useState<CatalogCard[]>([])
+  const [searching, setSearching] = useState(false)
+  const [selectedCard, setSelectedCard] = useState<CatalogCard | null>(null)
+  const [recentSets, setRecentSets] = useState<CardSet[]>([])
+  
+  // Form state
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   
-  // Form state - FIXED: renamed setName to cardSetName
-  const [cardName, setCardName] = useState('')
-  const [category, setCategory] = useState('pokemon')
-  const [cardSetName, setCardSetName] = useState('')
-  const [cardNumber, setCardNumber] = useState('')
-  const [year, setYear] = useState('')
-  const [rarity, setRarity] = useState('common')
+  // Card details (user fills in)
   const [condition, setCondition] = useState('near_mint')
   const [isGraded, setIsGraded] = useState(false)
   const [gradingCompany, setGradingCompany] = useState('PSA')
@@ -68,11 +106,100 @@ export default function AddCardPage() {
   const [currentValue, setCurrentValue] = useState('')
   const [quantity, setQuantity] = useState('1')
   const [notes, setNotes] = useState('')
-  const [imageUrl, setImageUrl] = useState('')
+  
+  // Manual entry fields (only used in manual mode)
+  const [manualName, setManualName] = useState('')
+  const [manualCategory, setManualCategory] = useState('pokemon')
+  const [manualSetName, setManualSetName] = useState('')
+  const [manualCardNumber, setManualCardNumber] = useState('')
+  const [manualYear, setManualYear] = useState('')
+  const [manualRarity, setManualRarity] = useState('common')
+  const [manualImageUrl, setManualImageUrl] = useState('')
 
+  // Load recent/popular sets on mount
+  useEffect(() => {
+    loadRecentSets()
+  }, [])
+
+  const loadRecentSets = async () => {
+    const { data } = await supabase
+      .from('card_sets')
+      .select('*')
+      .eq('is_featured', true)
+      .order('release_year', { ascending: false })
+      .limit(8)
+    
+    if (data) setRecentSets(data)
+  }
+
+  // Debounced search
+  const searchCards = useCallback(async (query: string, category: string) => {
+    if (!query || query.length < 2) {
+      setSearchResults([])
+      return
+    }
+
+    setSearching(true)
+    try {
+      let queryBuilder = supabase
+        .from('card_catalog')
+        .select(`
+          *,
+          card_sets (name, code)
+        `)
+        .ilike('name', `%${query}%`)
+        .limit(20)
+
+      if (category !== 'all') {
+        queryBuilder = queryBuilder.eq('category', category)
+      }
+
+      const { data, error } = await queryBuilder
+
+      if (error) throw error
+      setSearchResults(data || [])
+    } catch (err) {
+      console.error('Search error:', err)
+      setSearchResults([])
+    } finally {
+      setSearching(false)
+    }
+  }, [supabase])
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchCards(searchQuery, searchCategory)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery, searchCategory, searchCards])
+
+  // Select card from catalog
+  const handleSelectCard = (card: CatalogCard) => {
+    setSelectedCard(card)
+    setSearchQuery('')
+    setSearchResults([])
+    
+    // Pre-fill current value from catalog
+    if (card.price_raw) {
+      setCurrentValue(card.price_raw.toString())
+    }
+  }
+
+  // Submit form
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
+    
+    // Validation
+    if (searchMode === 'search' && !selectedCard) {
+      setError('Please select a card from the search results')
+      return
+    }
+    if (searchMode === 'manual' && !manualName) {
+      setError('Please enter a card name')
+      return
+    }
     
     setError('')
     setSaving(true)
@@ -94,15 +221,16 @@ export default function AddCardPage() {
         })
       }
 
-      // Insert card
-      const { error: insertError } = await supabase.from('cards').insert({
+      // Build card data
+      const cardData = searchMode === 'search' && selectedCard ? {
         user_id: user.id,
-        name: cardName,
-        category,
-        set_name: cardSetName || null,
-        card_number: cardNumber || null,
-        year: year ? parseInt(year) : null,
-        rarity,
+        catalog_card_id: selectedCard.id, // Link to catalog
+        name: selectedCard.name,
+        category: selectedCard.category,
+        set_name: selectedCard.card_sets?.name || selectedCard.set_code,
+        card_number: selectedCard.card_number,
+        year: selectedCard.year_released,
+        rarity: selectedCard.rarity,
         condition,
         is_graded: isGraded,
         grading_company: isGraded ? gradingCompany : null,
@@ -111,8 +239,27 @@ export default function AddCardPage() {
         current_value: currentValue ? parseFloat(currentValue) : null,
         quantity: parseInt(quantity) || 1,
         notes: notes || null,
-        image_url: imageUrl || null,
-      })
+        image_url: selectedCard.image_url || null,
+      } : {
+        user_id: user.id,
+        name: manualName,
+        category: manualCategory,
+        set_name: manualSetName || null,
+        card_number: manualCardNumber || null,
+        year: manualYear ? parseInt(manualYear) : null,
+        rarity: manualRarity,
+        condition,
+        is_graded: isGraded,
+        grading_company: isGraded ? gradingCompany : null,
+        grade: isGraded && grade ? parseFloat(grade) : null,
+        purchase_price: purchasePrice ? parseFloat(purchasePrice) : null,
+        current_value: currentValue ? parseFloat(currentValue) : null,
+        quantity: parseInt(quantity) || 1,
+        notes: notes || null,
+        image_url: manualImageUrl || null,
+      }
+
+      const { error: insertError } = await supabase.from('cards').insert(cardData)
 
       if (insertError) throw insertError
 
@@ -128,7 +275,7 @@ export default function AddCardPage() {
     }
   }
 
-  // Show loading while auth is being determined
+  // Auth loading state
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 flex items-center justify-center">
@@ -137,7 +284,7 @@ export default function AddCardPage() {
     )
   }
 
-  // Not logged in - show message (don't redirect)
+  // Not logged in
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 py-8">
@@ -181,7 +328,7 @@ export default function AddCardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 py-8">
-      <div className="max-w-2xl mx-auto px-4">
+      <div className="max-w-4xl mx-auto px-4">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <Link
@@ -192,8 +339,34 @@ export default function AddCardPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-white">Add Card</h1>
-            <p className="text-gray-400">Add a new card to your collection</p>
+            <p className="text-gray-400">Search our database or add manually</p>
           </div>
+        </div>
+
+        {/* Mode Toggle */}
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => setSearchMode('search')}
+            className={`flex-1 py-3 px-4 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
+              searchMode === 'search'
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+            }`}
+          >
+            <Search className="w-5 h-5" />
+            Search Database
+          </button>
+          <button
+            onClick={() => setSearchMode('manual')}
+            className={`flex-1 py-3 px-4 rounded-lg font-medium transition flex items-center justify-center gap-2 ${
+              searchMode === 'manual'
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+            }`}
+          >
+            <Sparkles className="w-5 h-5" />
+            Manual Entry
+          </button>
         </div>
 
         {/* Error */}
@@ -204,109 +377,309 @@ export default function AddCardPage() {
           </div>
         )}
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Card Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Card Name <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={cardName}
-              onChange={(e) => setCardName(e.target.value)}
-              placeholder="e.g., Charizard VMAX"
-              className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
-              required
-            />
-          </div>
+          {/* Search Mode */}
+          {searchMode === 'search' && (
+            <>
+              {/* Search Input */}
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search for cards by name (e.g., Charizard, Michael Jordan)..."
+                  className="w-full pl-12 pr-4 py-4 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 text-lg"
+                />
+                {searching && (
+                  <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-500 animate-spin" />
+                )}
+              </div>
 
-          {/* Category */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Category</label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setCategory(cat.id)}
-                  className={`p-3 rounded-lg border text-sm font-medium transition ${
-                    category === cat.id
-                      ? 'bg-purple-600 border-purple-500 text-white'
-                      : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'
-                  }`}
-                >
-                  <span className="text-lg mr-1">{cat.emoji}</span>
-                  {cat.name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Set & Number */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Set Name</label>
-              <input
-                type="text"
-                value={cardSetName}
-                onChange={(e) => setCardSetName(e.target.value)}
-                placeholder="e.g., Shining Fates"
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Card Number</label>
-              <input
-                type="text"
-                value={cardNumber}
-                onChange={(e) => setCardNumber(e.target.value)}
-                placeholder="e.g., 074/072"
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
-              />
-            </div>
-          </div>
-
-          {/* Year & Rarity */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Year</label>
-              <input
-                type="number"
-                value={year}
-                onChange={(e) => setYear(e.target.value)}
-                placeholder="e.g., 2021"
-                min="1900"
-                max="2030"
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Rarity</label>
-              <select
-                value={rarity}
-                onChange={(e) => setRarity(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
-              >
-                {RARITIES.map((r) => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
+              {/* Category Filter */}
+              <div className="flex flex-wrap gap-2">
+                {CATEGORIES.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setSearchCategory(cat.id)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
+                      searchCategory === cat.id
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                    }`}
+                  >
+                    {cat.emoji} {cat.name}
+                  </button>
                 ))}
-              </select>
-            </div>
+              </div>
+
+              {/* Search Results */}
+              {searchResults.length > 0 && (
+                <div className="bg-gray-800/50 rounded-xl border border-gray-700 overflow-hidden">
+                  <div className="p-3 border-b border-gray-700">
+                    <p className="text-sm text-gray-400">
+                      Found {searchResults.length} cards
+                    </p>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto divide-y divide-gray-700">
+                    {searchResults.map((card) => (
+                      <button
+                        key={card.id}
+                        type="button"
+                        onClick={() => handleSelectCard(card)}
+                        className="w-full p-3 flex items-center gap-4 hover:bg-gray-700/50 transition text-left"
+                      >
+                        <div className="w-12 h-16 bg-gray-700 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
+                          {card.image_url ? (
+                            <img
+                              src={card.image_url}
+                              alt={card.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <ImageIcon className="w-6 h-6 text-gray-500" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-white truncate">{card.name}</p>
+                          <p className="text-sm text-gray-400">
+                            {card.card_sets?.name || card.set_code} #{card.card_number}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              card.rarity === 'holo_rare' || card.rarity === 'ultra_rare'
+                                ? 'bg-purple-500/20 text-purple-400'
+                                : 'bg-gray-700 text-gray-400'
+                            }`}>
+                              {card.rarity.replace('_', ' ')}
+                            </span>
+                            {card.price_raw && (
+                              <span className="text-xs text-green-400">
+                                ${card.price_raw.toFixed(2)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <ChevronDown className="w-5 h-5 text-gray-500 -rotate-90" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Selected Card Display */}
+              {selectedCard && (
+                <div className="bg-gradient-to-r from-purple-900/30 to-pink-900/30 rounded-xl border border-purple-500/30 p-4">
+                  <div className="flex items-start gap-4">
+                    <div className="w-24 h-32 bg-gray-700 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
+                      {selectedCard.image_url ? (
+                        <img
+                          src={selectedCard.image_url}
+                          alt={selectedCard.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <ImageIcon className="w-8 h-8 text-gray-500" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="text-lg font-bold text-white">{selectedCard.name}</h3>
+                          <p className="text-gray-400">
+                            {selectedCard.card_sets?.name || selectedCard.set_code} #{selectedCard.card_number}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCard(null)}
+                          className="p-1 hover:bg-gray-700 rounded"
+                        >
+                          <X className="w-5 h-5 text-gray-400" />
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <span className="text-xs px-2 py-1 rounded bg-purple-500/20 text-purple-400">
+                          {selectedCard.category}
+                        </span>
+                        <span className="text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">
+                          {selectedCard.rarity.replace('_', ' ')}
+                        </span>
+                        {selectedCard.year_released && (
+                          <span className="text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">
+                            {selectedCard.year_released}
+                          </span>
+                        )}
+                      </div>
+                      {selectedCard.price_raw && (
+                        <div className="mt-3 flex items-center gap-4 text-sm">
+                          <span className="text-gray-400">Market Value:</span>
+                          <span className="text-green-400 font-medium">
+                            ${selectedCard.price_raw.toFixed(2)} raw
+                          </span>
+                          {selectedCard.price_psa_10 && (
+                            <span className="text-purple-400 font-medium">
+                              ${selectedCard.price_psa_10.toLocaleString()} PSA 10
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Popular Sets (when no search) */}
+              {!searchQuery && !selectedCard && recentSets.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium text-gray-400 mb-3">Popular Sets</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {recentSets.map((set) => (
+                      <button
+                        key={set.id}
+                        type="button"
+                        onClick={() => setSearchQuery(set.name)}
+                        className="p-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-left transition"
+                      >
+                        <p className="font-medium text-white text-sm truncate">{set.name}</p>
+                        <p className="text-xs text-gray-500">{set.total_cards} cards • {set.release_year}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Manual Entry Mode */}
+          {searchMode === 'manual' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Card Name <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={manualName}
+                  onChange={(e) => setManualName(e.target.value)}
+                  placeholder="e.g., Charizard VMAX"
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                  required={searchMode === 'manual'}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Category</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {CATEGORIES.filter(c => c.id !== 'all').map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setManualCategory(cat.id)}
+                      className={`p-3 rounded-lg border text-sm font-medium transition ${
+                        manualCategory === cat.id
+                          ? 'bg-purple-600 border-purple-500 text-white'
+                          : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'
+                      }`}
+                    >
+                      <span className="text-lg mr-1">{cat.emoji}</span>
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Set Name</label>
+                  <input
+                    type="text"
+                    value={manualSetName}
+                    onChange={(e) => setManualSetName(e.target.value)}
+                    placeholder="e.g., Base Set"
+                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Card Number</label>
+                  <input
+                    type="text"
+                    value={manualCardNumber}
+                    onChange={(e) => setManualCardNumber(e.target.value)}
+                    placeholder="e.g., 4/102"
+                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Year</label>
+                  <input
+                    type="number"
+                    value={manualYear}
+                    onChange={(e) => setManualYear(e.target.value)}
+                    placeholder="e.g., 1999"
+                    min="1900"
+                    max="2030"
+                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Rarity</label>
+                  <select
+                    value={manualRarity}
+                    onChange={(e) => setManualRarity(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="common">Common</option>
+                    <option value="uncommon">Uncommon</option>
+                    <option value="rare">Rare</option>
+                    <option value="holo_rare">Holo Rare</option>
+                    <option value="ultra_rare">Ultra Rare</option>
+                    <option value="secret_rare">Secret Rare</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Image URL (optional)</label>
+                <input
+                  type="url"
+                  value={manualImageUrl}
+                  onChange={(e) => setManualImageUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+            </>
+          )}
+
+          {/* Divider */}
+          <div className="border-t border-gray-700 pt-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Your Card Details</h3>
           </div>
 
           {/* Condition */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">Condition</label>
-            <select
-              value={condition}
-              onChange={(e) => setCondition(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
-            >
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
               {CONDITIONS.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setCondition(c.id)}
+                  className={`p-3 rounded-lg border text-center transition ${
+                    condition === c.id
+                      ? 'bg-purple-600 border-purple-500 text-white'
+                      : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'
+                  }`}
+                >
+                  <span className="font-medium text-sm">{c.name}</span>
+                </button>
               ))}
-            </select>
+            </div>
           </div>
 
           {/* Grading */}
@@ -398,18 +771,6 @@ export default function AddCardPage() {
             />
           </div>
 
-          {/* Image URL */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Image URL (optional)</label>
-            <input
-              type="url"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://..."
-              className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
-            />
-          </div>
-
           {/* Notes */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">Notes (optional)</label>
@@ -423,7 +784,7 @@ export default function AddCardPage() {
           </div>
 
           {/* Submit */}
-          <div className="flex gap-4">
+          <div className="flex gap-4 pt-4">
             <Link
               href="/collection"
               className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-lg transition text-center"
@@ -432,7 +793,7 @@ export default function AddCardPage() {
             </Link>
             <button
               type="submit"
-              disabled={saving || !cardName}
+              disabled={saving || (searchMode === 'search' && !selectedCard) || (searchMode === 'manual' && !manualName)}
               className="flex-1 flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium rounded-lg transition disabled:opacity-50"
             >
               {saving ? (
@@ -443,7 +804,7 @@ export default function AddCardPage() {
               ) : (
                 <>
                   <Save className="w-5 h-5" />
-                  Add Card
+                  Add to Collection
                 </>
               )}
             </button>
