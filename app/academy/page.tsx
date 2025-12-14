@@ -79,7 +79,7 @@ export default function AcademyPage() {
     try {
       // Get featured courses
       const { data: featured } = await supabase
-        .from('card_courses')
+        .from('cv_courses')
         .select('*')
         .eq('is_featured', true)
         .order('created_at', { ascending: false })
@@ -89,7 +89,7 @@ export default function AcademyPage() {
 
       // Get all courses
       const { data: all } = await supabase
-        .from('card_courses')
+        .from('cv_courses')
         .select('*')
         .order('created_at', { ascending: false })
       
@@ -105,7 +105,7 @@ export default function AcademyPage() {
     if (!user) return
     
     const { data } = await supabase
-      .from('course_progress')
+      .from('cv_user_course_progress')
       .select('course_id, status, current_module')
       .eq('user_id', user.id)
     
