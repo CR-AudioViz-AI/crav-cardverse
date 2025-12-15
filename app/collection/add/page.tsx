@@ -1,33 +1,26 @@
 // ============================================================================
-// ADD CARD PAGE - MOBILE-FIRST COLLECTION MANAGEMENT
-// Search 156,000+ cards, scan with camera, add with your photo
+// ADD CARD PAGE - BULLETPROOF SEARCH
+// Search 156,000+ cards (Pokemon, MTG, Yu-Gi-Oh, Lorcana, Sports)
 // CravCards - CR AudioViz AI, LLC
-// Created: December 12, 2025
+// Fixed: December 14, 2025
 // ============================================================================
 
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import { 
   Search, 
   Camera, 
   X, 
-  Plus, 
   Loader2, 
-  ChevronDown,
   Upload,
   Star,
-  DollarSign,
-  Calendar,
-  Hash,
-  Sparkles,
   CheckCircle2,
   ArrowLeft,
   Filter,
+  AlertCircle,
 } from 'lucide-react';
-import CardScanner from '@/components/CardScanner';
 
 interface SearchResult {
   id: string;
@@ -39,28 +32,12 @@ interface SearchResult {
   image_url: string;
   market_price: number | null;
   source: string;
-}
-
-interface CollectionCard {
-  card_id: string;
-  card_name: string;
-  category: string;
-  set_name: string;
-  card_number: string;
-  rarity: string;
-  image_url: string;
-  user_image_url?: string;
-  condition: string;
-  grade?: string;
-  grading_company?: string;
-  purchase_price?: number;
-  purchase_date?: string;
-  notes?: string;
+  team?: string;
+  sport?: string;
 }
 
 export default function AddCardPage() {
   const router = useRouter();
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Search state
@@ -68,13 +45,10 @@ export default function AddCardPage() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
   
   // Filter state
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [showFilters, setShowFilters] = useState(false);
-  
-  // Scanner state
-  const [showScanner, setShowScanner] = useState(false);
   
   // Selected card state
   const [selectedCard, setSelectedCard] = useState<SearchResult | null>(null);
@@ -84,52 +58,67 @@ export default function AddCardPage() {
   const [grade, setGrade] = useState('');
   const [gradingCompany, setGradingCompany] = useState('PSA');
   const [purchasePrice, setPurchasePrice] = useState('');
-  const [purchaseDate, setPurchaseDate] = useState('');
   const [notes, setNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Debounced search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchQuery.length >= 2) {
-        performSearch(searchQuery);
-      } else {
-        setSearchResults([]);
-      }
-    }, 300);
+  // Search function
+  const doSearch = async (query: string, category: string) => {
+    if (query.length < 2) {
+      setSearchResults([]);
+      setHasSearched(false);
+      return;
+    }
 
-    return () => clearTimeout(timer);
-  }, [searchQuery, categoryFilter]);
-
-  // Perform search
-  const performSearch = async (query: string) => {
     setIsSearching(true);
     setSearchError(null);
+    setHasSearched(true);
 
     try {
       const params = new URLSearchParams({
         q: query,
-        category: categoryFilter,
+        category: category,
         limit: '30',
       });
 
+      console.log('Searching:', `/api/cards/search?${params}`);
+      
       const response = await fetch(`/api/cards/search?${params}`);
       const data = await response.json();
 
+      console.log('Search response:', data);
+
       if (data.success) {
-        setSearchResults(data.results);
+        setSearchResults(data.results || []);
+        if (data.results?.length === 0) {
+          setSearchError(`No results found for "${query}"`);
+        }
       } else {
         setSearchError(data.error || 'Search failed');
         setSearchResults([]);
       }
     } catch (err) {
       console.error('Search error:', err);
-      setSearchError('Failed to search. Please try again.');
+      setSearchError('Network error. Please try again.');
       setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
+  };
+
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      doSearch(searchQuery, categoryFilter);
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, categoryFilter]);
+
+  // Handle search submit (for enter key)
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    doSearch(searchQuery, categoryFilter);
   };
 
   // Handle card selection
@@ -140,7 +129,6 @@ export default function AddCardPage() {
     setIsGraded(false);
     setGrade('');
     setPurchasePrice('');
-    setPurchaseDate('');
     setNotes('');
     setSaveSuccess(false);
   };
@@ -148,75 +136,64 @@ export default function AddCardPage() {
   // Handle user image upload
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setUserImage(e.target?.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // Handle scanner result
-  const handleScanComplete = (result: any) => {
-    setShowScanner(false);
-    if (result.success && result.card) {
-      handleSelectCard(result.card);
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setUserImage(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  // Save card to collection
-  const handleSaveCard = async () => {
+  // Save to collection
+  const handleSave = async () => {
     if (!selectedCard) return;
 
     setIsSaving(true);
-    setSaveSuccess(false);
-
     try {
-      const cardData: CollectionCard = {
-        card_id: selectedCard.id,
-        card_name: selectedCard.name,
-        category: selectedCard.category,
-        set_name: selectedCard.set_name,
-        card_number: selectedCard.card_number,
-        rarity: selectedCard.rarity,
-        image_url: selectedCard.image_url,
-        user_image_url: userImage || undefined,
-        condition,
-        grade: isGraded ? grade : undefined,
-        grading_company: isGraded ? gradingCompany : undefined,
-        purchase_price: purchasePrice ? parseFloat(purchasePrice) : undefined,
-        purchase_date: purchaseDate || undefined,
-        notes: notes || undefined,
-      };
-
       const response = await fetch('/api/collection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cardData),
+        body: JSON.stringify({
+          card_id: selectedCard.id,
+          card_name: selectedCard.name,
+          category: selectedCard.category,
+          set_name: selectedCard.set_name,
+          card_number: selectedCard.card_number,
+          rarity: selectedCard.rarity,
+          image_url: selectedCard.image_url,
+          user_image_url: userImage,
+          condition,
+          is_graded: isGraded,
+          grade: isGraded ? grade : null,
+          grading_company: isGraded ? gradingCompany : null,
+          purchase_price: purchasePrice ? parseFloat(purchasePrice) : null,
+          notes,
+        }),
       });
 
       const data = await response.json();
-
+      
       if (data.success) {
         setSaveSuccess(true);
-        // Reset form after short delay
         setTimeout(() => {
           setSelectedCard(null);
-          setSaveSuccess(false);
-        }, 2000);
+          setSearchQuery('');
+          setSearchResults([]);
+          setHasSearched(false);
+        }, 1500);
       } else {
-        throw new Error(data.error || 'Failed to save card');
+        alert(data.error || 'Failed to save card');
       }
     } catch (err) {
       console.error('Save error:', err);
-      alert(err instanceof Error ? err.message : 'Failed to save card');
+      alert('Failed to save. Please try again.');
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Category badge color
+  // Get category badge color
   const getCategoryColor = (category: string) => {
     if (category.includes('pokemon')) return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30';
     if (category.includes('mtg')) return 'bg-purple-500/20 text-purple-300 border-purple-500/30';
@@ -226,7 +203,19 @@ export default function AddCardPage() {
     return 'bg-gray-500/20 text-gray-300 border-gray-500/30';
   };
 
-  // Condition options
+  // Get display name for category
+  const getCategoryDisplay = (cat: string) => {
+    const names: Record<string, string> = {
+      'all': 'All Cards',
+      'pokemon': 'Pokemon',
+      'mtg': 'Magic',
+      'yugioh': 'Yu-Gi-Oh',
+      'lorcana': 'Lorcana',
+      'sports': 'Sports',
+    };
+    return names[cat] || cat;
+  };
+
   const CONDITIONS = [
     { value: 'mint', label: 'Mint (M)' },
     { value: 'near_mint', label: 'Near Mint (NM)' },
@@ -238,17 +227,10 @@ export default function AddCardPage() {
   ];
 
   const GRADING_COMPANIES = ['PSA', 'BGS', 'CGC', 'SGC', 'Other'];
+  const CATEGORIES = ['all', 'pokemon', 'mtg', 'yugioh', 'lorcana', 'sports'];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-black text-white">
-      {/* Scanner Modal */}
-      {showScanner && (
-        <CardScanner 
-          onScanComplete={handleScanComplete}
-          onClose={() => setShowScanner(false)}
-        />
-      )}
-
       {/* Header */}
       <header className="sticky top-0 z-40 bg-gray-900/95 backdrop-blur-md border-b border-white/10">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
@@ -259,13 +241,6 @@ export default function AddCardPage() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h1 className="text-lg font-semibold flex-1">Add Card</h1>
-          <button
-            onClick={() => setShowScanner(true)}
-            className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
-          >
-            <Camera className="w-4 h-4" />
-            <span className="hidden sm:inline text-sm">Scan</span>
-          </button>
         </div>
       </header>
 
@@ -274,52 +249,44 @@ export default function AddCardPage() {
           // Search View
           <>
             {/* Search Input */}
-            <div className="relative mb-4">
+            <form onSubmit={handleSearchSubmit} className="relative mb-4">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
-                ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search 156,000+ cards..."
+                placeholder="Search Pete Rose, Charizard, Black Lotus..."
                 className="w-full pl-12 pr-12 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 text-lg"
                 autoFocus
               />
               {searchQuery && (
                 <button
-                  onClick={() => setSearchQuery('')}
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSearchResults([]);
+                    setHasSearched(false);
+                  }}
                   className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-full"
                 >
                   <X className="w-4 h-4 text-gray-400" />
                 </button>
               )}
-            </div>
+            </form>
 
-            {/* Filters */}
+            {/* Category Filters */}
             <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-colors whitespace-nowrap ${
-                  showFilters 
-                    ? 'bg-blue-600 border-blue-500 text-white' 
-                    : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'
-                }`}
-              >
-                <Filter className="w-4 h-4" />
-                Filter
-              </button>
-              
-              {['all', 'pokemon', 'mtg', 'yugioh', 'lorcana', 'sports'].map((cat) => (
+              {CATEGORIES.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setCategoryFilter(cat)}
-                  className={`px-4 py-2 rounded-full border transition-colors whitespace-nowrap capitalize ${
+                  className={`px-4 py-2 rounded-full border transition-colors whitespace-nowrap ${
                     categoryFilter === cat
                       ? 'bg-white/20 border-white/30 text-white'
                       : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
                   }`}
                 >
-                  {cat === 'all' ? 'All Cards' : cat === 'mtg' ? 'Magic' : cat === 'yugioh' ? 'Yu-Gi-Oh' : cat === 'lorcana' ? 'Lorcana' : cat}
+                  {getCategoryDisplay(cat)}
                 </button>
               ))}
             </div>
@@ -328,11 +295,13 @@ export default function AddCardPage() {
             {isSearching ? (
               <div className="flex flex-col items-center justify-center py-16 text-gray-400">
                 <Loader2 className="w-8 h-8 animate-spin mb-4" />
-                <p>Searching...</p>
+                <p>Searching 156,000+ cards...</p>
               </div>
-            ) : searchError ? (
-              <div className="text-center py-16 text-red-400">
-                <p>{searchError}</p>
+            ) : searchError && hasSearched ? (
+              <div className="text-center py-16">
+                <AlertCircle className="w-12 h-12 mx-auto mb-4 text-yellow-500" />
+                <p className="text-yellow-400">{searchError}</p>
+                <p className="text-sm mt-2 text-gray-500">Try a different search term</p>
               </div>
             ) : searchResults.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
@@ -350,6 +319,9 @@ export default function AddCardPage() {
                           alt={card.name}
                           className="w-full h-full object-contain"
                           loading="lazy"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🎴</text></svg>';
+                          }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-gray-600">
@@ -371,7 +343,7 @@ export default function AddCardPage() {
                         {card.name}
                       </h3>
                       <p className="text-xs text-gray-400 line-clamp-1 mt-0.5">
-                        {card.set_name}
+                        {card.team || card.set_name}
                       </p>
                       <div className="flex items-center gap-2 mt-2">
                         <span className={`text-xs px-2 py-0.5 rounded-full border ${getCategoryColor(card.category)}`}>
@@ -382,17 +354,18 @@ export default function AddCardPage() {
                   </button>
                 ))}
               </div>
-            ) : searchQuery.length >= 2 ? (
+            ) : searchQuery.length >= 2 && hasSearched ? (
               <div className="text-center py-16 text-gray-400">
-                <Sparkles className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <p>No cards found for "{searchQuery}"</p>
-                <p className="text-sm mt-2">Try a different search term or scan your card</p>
+                <p className="text-sm mt-2">Try a different search term</p>
               </div>
             ) : (
               <div className="text-center py-16 text-gray-400">
                 <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Search for a card to add to your collection</p>
-                <p className="text-sm mt-2">Or tap "Scan" to identify a card with your camera</p>
+                <p className="text-lg mb-2">Search for any card</p>
+                <p className="text-sm">Pokemon, Magic, Yu-Gi-Oh, Lorcana, Sports</p>
+                <p className="text-xs mt-4 text-gray-500">156,000+ cards available</p>
               </div>
             )}
           </>
@@ -402,31 +375,41 @@ export default function AddCardPage() {
             {/* Back button */}
             <button
               onClick={() => setSelectedCard(null)}
-              className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition-colors"
+              className="flex items-center gap-2 text-gray-400 hover:text-white mb-6"
             >
               <ArrowLeft className="w-4 h-4" />
               Back to search
             </button>
 
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Card Preview */}
-              <div className="space-y-4">
-                <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-black/50 border border-white/10">
-                  <img
-                    src={userImage || selectedCard.image_url}
-                    alt={selectedCard.name}
-                    className="w-full h-full object-contain"
-                  />
-                  
-                  {/* Upload overlay */}
+            {saveSuccess ? (
+              <div className="text-center py-16">
+                <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold mb-2">Card Added!</h2>
+                <p className="text-gray-400">Your card has been saved to your collection</p>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 gap-8">
+                {/* Card Preview */}
+                <div>
+                  <div className="relative aspect-[3/4] bg-black/30 rounded-xl overflow-hidden">
+                    <img
+                      src={userImage || selectedCard.image_url}
+                      alt={selectedCard.name}
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🎴</text></svg>';
+                      }}
+                    />
+                  </div>
+
+                  {/* Upload Photo Button */}
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 opacity-0 hover:opacity-100 transition-opacity"
+                    className="w-full mt-4 flex items-center justify-center gap-2 py-3 border-2 border-dashed border-white/20 rounded-xl hover:border-blue-500/50 hover:bg-blue-500/10 transition-colors"
                   >
-                    <Upload className="w-8 h-8 mb-2" />
-                    <span className="text-sm">Upload your photo</span>
+                    <Upload className="w-5 h-5" />
+                    {userImage ? 'Change Your Photo' : 'Add Your Photo'}
                   </button>
-                  
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -436,161 +419,122 @@ export default function AddCardPage() {
                   />
                 </div>
 
-                {/* Card Info */}
-                <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                  <h2 className="text-xl font-bold">{selectedCard.name}</h2>
-                  <p className="text-gray-400 mt-1">{selectedCard.set_name}</p>
-                  <div className="flex items-center gap-3 mt-3">
-                    <span className={`text-xs px-2 py-1 rounded-full border ${getCategoryColor(selectedCard.category)}`}>
+                {/* Card Details Form */}
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-2xl font-bold">{selectedCard.name}</h2>
+                    <p className="text-gray-400">{selectedCard.team || selectedCard.set_name}</p>
+                    <span className={`inline-block mt-2 text-xs px-2 py-1 rounded-full border ${getCategoryColor(selectedCard.category)}`}>
                       {selectedCard.category.replace('sports_', '').replace('_', ' ')}
                     </span>
-                    <span className="text-xs text-gray-400">#{selectedCard.card_number}</span>
-                    <span className="text-xs text-gray-400">{selectedCard.rarity}</span>
                   </div>
-                  {selectedCard.market_price && (
-                    <div className="mt-3 flex items-center gap-2 text-green-400">
-                      <DollarSign className="w-4 h-4" />
-                      <span>Market: ${selectedCard.market_price.toFixed(2)}</span>
+
+                  {/* Condition */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Condition</label>
+                    <select
+                      value={condition}
+                      onChange={(e) => setCondition(e.target.value)}
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white"
+                    >
+                      {CONDITIONS.map((c) => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Grading Toggle */}
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">Professionally Graded?</label>
+                    <button
+                      onClick={() => setIsGraded(!isGraded)}
+                      className={`w-12 h-6 rounded-full transition-colors ${
+                        isGraded ? 'bg-blue-600' : 'bg-gray-700'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                        isGraded ? 'translate-x-6' : 'translate-x-0.5'
+                      }`} />
+                    </button>
+                  </div>
+
+                  {/* Grading Details */}
+                  {isGraded && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Company</label>
+                        <select
+                          value={gradingCompany}
+                          onChange={(e) => setGradingCompany(e.target.value)}
+                          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white"
+                        >
+                          {GRADING_COMPANIES.map((gc) => (
+                            <option key={gc} value={gc}>{gc}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Grade</label>
+                        <input
+                          type="text"
+                          value={grade}
+                          onChange={(e) => setGrade(e.target.value)}
+                          placeholder="e.g. 10, 9.5"
+                          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white"
+                        />
+                      </div>
                     </div>
                   )}
-                </div>
-              </div>
 
-              {/* Add to Collection Form */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Add to Collection</h3>
-
-                {/* Condition */}
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Condition</label>
-                  <select
-                    value={condition}
-                    onChange={(e) => setCondition(e.target.value)}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                  >
-                    {CONDITIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value} className="bg-gray-900">
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Graded Toggle */}
-                <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
-                  <span>Professionally Graded?</span>
-                  <button
-                    onClick={() => setIsGraded(!isGraded)}
-                    className={`relative w-12 h-6 rounded-full transition-colors ${
-                      isGraded ? 'bg-blue-600' : 'bg-gray-600'
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                        isGraded ? 'translate-x-6' : ''
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {/* Grade Fields */}
-                {isGraded && (
-                  <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-2">Company</label>
-                      <select
-                        value={gradingCompany}
-                        onChange={(e) => setGradingCompany(e.target.value)}
-                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                      >
-                        {GRADING_COMPANIES.map((company) => (
-                          <option key={company} value={company} className="bg-gray-900">
-                            {company}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-2">Grade</label>
+                  {/* Purchase Price */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Purchase Price (optional)</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">$</span>
                       <input
-                        type="text"
-                        value={grade}
-                        onChange={(e) => setGrade(e.target.value)}
-                        placeholder="e.g., 10, 9.5"
-                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                        type="number"
+                        value={purchasePrice}
+                        onChange={(e) => setPurchasePrice(e.target.value)}
+                        placeholder="0.00"
+                        step="0.01"
+                        className="w-full pl-8 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white"
                       />
                     </div>
                   </div>
-                )}
 
-                {/* Purchase Info */}
-                <div className="grid grid-cols-2 gap-3">
+                  {/* Notes */}
                   <div>
-                    <label className="block text-sm text-gray-400 mb-2">
-                      <DollarSign className="w-3 h-3 inline mr-1" />
-                      Purchase Price
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={purchasePrice}
-                      onChange={(e) => setPurchasePrice(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    <label className="block text-sm font-medium mb-2">Notes (optional)</label>
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Any special notes about this card..."
+                      rows={3}
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white resize-none"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-2">
-                      <Calendar className="w-3 h-3 inline mr-1" />
-                      Purchase Date
-                    </label>
-                    <input
-                      type="date"
-                      value={purchaseDate}
-                      onChange={(e) => setPurchaseDate(e.target.value)}
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                    />
-                  </div>
-                </div>
 
-                {/* Notes */}
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Notes (optional)</label>
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Any additional notes about this card..."
-                    rows={3}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
-                  />
+                  {/* Save Button */}
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-xl font-semibold text-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Star className="w-5 h-5" />
+                        Add to Collection
+                      </>
+                    )}
+                  </button>
                 </div>
-
-                {/* Save Button */}
-                <button
-                  onClick={handleSaveCard}
-                  disabled={isSaving || saveSuccess}
-                  className={`w-full py-4 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all ${
-                    saveSuccess
-                      ? 'bg-green-600 hover:bg-green-600'
-                      : 'bg-blue-600 hover:bg-blue-500'
-                  } disabled:opacity-70`}
-                >
-                  {isSaving ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : saveSuccess ? (
-                    <>
-                      <CheckCircle2 className="w-5 h-5" />
-                      Added to Collection!
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-5 h-5" />
-                      Add to Collection
-                    </>
-                  )}
-                </button>
               </div>
-            </div>
+            )}
           </div>
         )}
       </main>
