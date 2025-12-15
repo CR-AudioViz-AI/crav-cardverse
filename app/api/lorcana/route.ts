@@ -1,123 +1,165 @@
 // ============================================================================
-// LORCANA CARD API
+// LORCANA CARD API - FIXED
 // Free API from lorcana-api.com - Disney TCG cards
+// API only supports /cards/all - we fetch and filter locally
 // CravCards - CR AudioViz AI, LLC
 // Created: December 14, 2025
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 
-const LORCANA_API = 'https://api.lorcana-api.com/cards';
+const LORCANA_API = 'https://api.lorcana-api.com/cards/all';
+
+// Cache the full card list (it's not that big)
+let cachedCards: any[] | null = null;
+let cacheTime = 0;
+const CACHE_DURATION = 3600000; // 1 hour
 
 interface LorcanaCard {
-  id: string;
-  name: string;
-  title?: string;
-  cost: number;
-  inkwell: boolean;
-  color: string;
-  type: string;
-  classifications?: string[];
-  text?: string;
-  flavor_text?: string;
-  strength?: number;
-  willpower?: number;
-  lore?: number;
-  rarity: string;
-  set_name: string;
-  set_num: number;
-  set_id: string;
-  image: string;
-  franchise?: string;
-  artist?: string;
+  Name: string;
+  Title?: string;
+  Cost: number;
+  Inkwell: boolean;
+  Color: string;
+  Type: string;
+  Classifications?: string[];
+  Body_Text?: string;
+  Flavor_Text?: string;
+  Strength?: number;
+  Willpower?: number;
+  Lore?: number;
+  Rarity: string;
+  Set_Name: string;
+  Set_Num: number;
+  Card_Num: number;
+  Image: string;
+  Franchise?: string;
+  Artist?: string;
+}
+
+async function getAllCards(): Promise<LorcanaCard[]> {
+  const now = Date.now();
+  
+  // Return cached if valid
+  if (cachedCards && (now - cacheTime) < CACHE_DURATION) {
+    return cachedCards;
+  }
+
+  const response = await fetch(LORCANA_API, {
+    headers: { 'Accept': 'application/json' },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Lorcana API error: ${response.status}`);
+  }
+
+  cachedCards = await response.json();
+  cacheTime = now;
+  
+  return cachedCards || [];
 }
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('q') || searchParams.get('query') || '';
-  const color = searchParams.get('color'); // Amber, Amethyst, Emerald, Ruby, Sapphire, Steel
-  const rarity = searchParams.get('rarity');
-  const set = searchParams.get('set');
+  const color = searchParams.get('color')?.toLowerCase();
+  const rarity = searchParams.get('rarity')?.toLowerCase();
+  const set = searchParams.get('set')?.toLowerCase();
+  const limit = Math.min(parseInt(searchParams.get('limit') || '30'), 100);
 
   if (!query && !color && !set) {
     return NextResponse.json({
       success: false,
       error: 'Search query required. Use ?q=card_name',
-      example: '/api/lorcana?q=mickey',
+      examples: [
+        '/api/lorcana?q=mickey',
+        '/api/lorcana?q=elsa',
+        '/api/lorcana?color=amber',
+        '/api/lorcana?q=stitch&color=sapphire',
+      ],
       colors: ['Amber', 'Amethyst', 'Emerald', 'Ruby', 'Sapphire', 'Steel'],
     });
   }
 
   try {
-    // Lorcana API uses different endpoint for search
-    let url = `${LORCANA_API}/search`;
-    const params = new URLSearchParams();
-    
-    if (query) {
-      params.append('name', query);
-    }
-    if (color) {
-      params.append('color', color);
-    }
-    if (rarity) {
-      params.append('rarity', rarity);
-    }
-    if (set) {
-      params.append('set', set);
-    }
+    // Fetch all cards (cached)
+    const allCards = await getAllCards();
+    const queryLower = query.toLowerCase();
 
-    const fullUrl = params.toString() ? `${url}?${params.toString()}` : `${LORCANA_API}/all`;
+    // Filter cards
+    let filtered = allCards.filter(card => {
+      // Name filter
+      if (query) {
+        const name = (card.Name || '').toLowerCase();
+        const title = (card.Title || '').toLowerCase();
+        if (!name.includes(queryLower) && !title.includes(queryLower)) {
+          return false;
+        }
+      }
 
-    const response = await fetch(fullUrl, {
-      headers: {
-        'Accept': 'application/json',
-      },
-      next: { revalidate: 3600 },
+      // Color filter
+      if (color && (card.Color || '').toLowerCase() !== color) {
+        return false;
+      }
+
+      // Rarity filter
+      if (rarity && (card.Rarity || '').toLowerCase() !== rarity) {
+        return false;
+      }
+
+      // Set filter
+      if (set && !(card.Set_Name || '').toLowerCase().includes(set)) {
+        return false;
+      }
+
+      return true;
     });
 
-    if (!response.ok) {
-      throw new Error(`Lorcana API error: ${response.status}`);
-    }
-
-    const rawCards: LorcanaCard[] = await response.json();
+    // Sort by relevance (exact matches first)
+    filtered.sort((a, b) => {
+      const aExact = (a.Name || '').toLowerCase() === queryLower ? 0 : 1;
+      const bExact = (b.Name || '').toLowerCase() === queryLower ? 0 : 1;
+      return aExact - bExact;
+    });
 
     // Transform to CravCards format
-    const cards = (Array.isArray(rawCards) ? rawCards : []).slice(0, 50).map(card => {
-      const fullName = card.title ? `${card.name} - ${card.title}` : card.name;
+    const cards = filtered.slice(0, limit).map(card => {
+      const fullName = card.Title ? `${card.Name} - ${card.Title}` : card.Name;
 
       return {
-        id: `lorcana-${card.id || card.set_id}-${card.set_num}`,
+        id: `lorcana-${card.Set_Num}-${card.Card_Num}`,
         name: fullName,
         category: 'lorcana',
-        type: card.type,
+        type: card.Type,
         
         // Card details
-        cost: card.cost,
-        inkwell: card.inkwell,
-        color: card.color,
-        classifications: card.classifications || [],
-        text: card.text,
-        flavor_text: card.flavor_text,
+        cost: card.Cost,
+        inkwell: card.Inkwell,
+        color: card.Color,
+        classifications: card.Classifications || [],
+        text: card.Body_Text,
+        flavor_text: card.Flavor_Text,
         
         // Character stats
-        strength: card.strength,
-        willpower: card.willpower,
-        lore: card.lore,
+        strength: card.Strength,
+        willpower: card.Willpower,
+        lore: card.Lore,
 
         // Set info
-        set_name: card.set_name,
-        set_number: card.set_num,
-        rarity: card.rarity,
+        set_name: card.Set_Name,
+        set_number: card.Set_Num,
+        card_number: card.Card_Num,
+        rarity: card.Rarity,
         
         // Franchise (Disney property)
-        franchise: card.franchise,
-        artist: card.artist,
+        franchise: card.Franchise,
+        artist: card.Artist,
 
         // Images
-        image_url: card.image,
-        image_large: card.image,
+        image_url: card.Image,
+        image_large: card.Image,
 
-        // Prices (Lorcana API doesn't include prices, would need TCGPlayer)
+        // Price placeholder
         market_price: null,
 
         source: 'Lorcana-API',
@@ -128,8 +170,9 @@ export async function GET(request: NextRequest) {
       success: true,
       cards,
       query,
-      totalResults: Array.isArray(rawCards) ? rawCards.length : 0,
+      totalResults: filtered.length,
       returnedResults: cards.length,
+      totalInDatabase: allCards.length,
       source: 'lorcana-api.com',
     });
 
