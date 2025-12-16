@@ -1,8 +1,8 @@
 // ============================================================================
-// UNIFIED CARD SEARCH API - ALL 5 SOURCES
+// UNIFIED CARD SEARCH API - USES INTERNAL ROUTES
 // Pokemon, MTG, Yu-Gi-Oh, Lorcana, Sports
 // CravCards - CR AudioViz AI, LLC
-// Fixed: December 15, 2025
+// Fixed: December 16, 2025 - Calls internal APIs for reliability
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -22,6 +22,13 @@ interface SearchResult {
   sport?: string;
 }
 
+// Get the base URL for internal API calls
+function getBaseUrl(request: NextRequest): string {
+  const host = request.headers.get('host') || 'cravcards.com';
+  const protocol = host.includes('localhost') ? 'http' : 'https';
+  return `${protocol}://${host}`;
+}
+
 // Helper function with timeout
 async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
   let timeoutId: NodeJS.Timeout;
@@ -38,166 +45,139 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Pro
   ]);
 }
 
-// Search Pokemon TCG
-async function searchPokemon(query: string): Promise<SearchResult[]> {
+// Search Pokemon via internal API
+async function searchPokemon(query: string, baseUrl: string): Promise<SearchResult[]> {
   try {
-    const response = await fetch(
-      `https://api.pokemontcg.io/v2/cards?q=name:${encodeURIComponent(query)}*&pageSize=10`
-    );
+    const response = await fetch(`${baseUrl}/api/pokemon?q=${encodeURIComponent(query)}`);
     if (!response.ok) return [];
     
     const data = await response.json();
-    return (data.data || []).slice(0, 10).map((card: any) => ({
+    if (!data.success) return [];
+    
+    return (data.cards || []).slice(0, 15).map((card: any) => ({
       id: `pokemon-${card.id}`,
       name: card.name,
       category: 'pokemon',
-      set_name: card.set?.name || 'Pokemon TCG',
-      card_number: card.number || '',
+      set_name: card.set_name || 'Pokemon TCG',
+      card_number: card.card_number || '',
       rarity: card.rarity || 'Common',
-      image_url: card.images?.small || card.images?.large || '',
-      market_price: card.cardmarket?.prices?.averageSellPrice || null,
+      image_url: card.image_url || '',
+      market_price: card.price_market || card.price_mid || null,
       source: 'Pokemon TCG',
     }));
-  } catch {
+  } catch (err) {
+    console.error('Pokemon search error:', err);
     return [];
   }
 }
 
-// Search Magic: The Gathering
-async function searchMTG(query: string): Promise<SearchResult[]> {
+// Search MTG via internal API
+async function searchMTG(query: string, baseUrl: string): Promise<SearchResult[]> {
   try {
-    const response = await fetch(
-      `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&unique=cards`
-    );
+    const response = await fetch(`${baseUrl}/api/mtg?q=${encodeURIComponent(query)}`);
     if (!response.ok) return [];
     
     const data = await response.json();
-    return (data.data || []).slice(0, 10).map((card: any) => ({
+    if (!data.success) return [];
+    
+    return (data.cards || []).slice(0, 15).map((card: any) => ({
       id: `mtg-${card.id}`,
       name: card.name,
       category: 'mtg',
       set_name: card.set_name || 'Magic: The Gathering',
-      card_number: card.collector_number || '',
+      card_number: card.card_number || '',
       rarity: card.rarity || 'common',
-      image_url: card.image_uris?.normal || card.image_uris?.small || '',
-      market_price: card.prices?.usd ? parseFloat(card.prices.usd) : null,
+      image_url: card.image_normal || card.image_small || '',
+      market_price: card.market_price || null,
       source: 'Scryfall',
     }));
-  } catch {
+  } catch (err) {
+    console.error('MTG search error:', err);
     return [];
   }
 }
 
-// Search Yu-Gi-Oh
-async function searchYuGiOh(query: string): Promise<SearchResult[]> {
+// Search Yu-Gi-Oh via internal API
+async function searchYuGiOh(query: string, baseUrl: string): Promise<SearchResult[]> {
   try {
-    const response = await fetch(
-      `https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}&num=10&offset=0`
-    );
+    const response = await fetch(`${baseUrl}/api/yugioh?q=${encodeURIComponent(query)}`);
     if (!response.ok) return [];
     
     const data = await response.json();
-    if (data.error) return [];
+    if (!data.success) return [];
     
-    return (data.data || []).slice(0, 10).map((card: any) => ({
+    return (data.cards || []).slice(0, 15).map((card: any) => ({
       id: `yugioh-${card.id}`,
       name: card.name,
       category: 'yugioh',
-      set_name: card.card_sets?.[0]?.set_name || 'Yu-Gi-Oh',
-      card_number: card.card_sets?.[0]?.set_code || '',
-      rarity: card.card_sets?.[0]?.set_rarity || 'Common',
-      image_url: card.card_images?.[0]?.image_url_small || '',
-      market_price: card.card_prices?.[0]?.tcgplayer_price ? parseFloat(card.card_prices[0].tcgplayer_price) : null,
+      set_name: card.set_name || 'Yu-Gi-Oh',
+      card_number: card.set_code || '',
+      rarity: card.rarity || 'Common',
+      image_url: card.image_url || '',
+      market_price: card.market_price || card.price_tcgplayer || null,
       source: 'YGOProDeck',
     }));
-  } catch {
+  } catch (err) {
+    console.error('Yu-Gi-Oh search error:', err);
     return [];
   }
 }
 
-// Lorcana cache
-let lorcanaCache: any[] | null = null;
-let lorcanaCacheTime = 0;
-
-// Search Lorcana (Disney TCG)
-async function searchLorcana(query: string): Promise<SearchResult[]> {
+// Search Lorcana via internal API
+async function searchLorcana(query: string, baseUrl: string): Promise<SearchResult[]> {
   try {
-    // Check cache (1 hour TTL)
-    const now = Date.now();
-    if (!lorcanaCache || (now - lorcanaCacheTime) > 3600000) {
-      const response = await fetch('https://api.lorcana-api.com/cards/all');
-      if (response.ok) {
-        lorcanaCache = await response.json();
-        lorcanaCacheTime = now;
-      }
-    }
-    
-    if (!lorcanaCache) return [];
-    
-    const queryLower = query.toLowerCase();
-    const matches = lorcanaCache.filter((card: any) => {
-      const name = (card.Name || '').toLowerCase();
-      const title = (card.Title || '').toLowerCase();
-      return name.includes(queryLower) || title.includes(queryLower);
-    }).slice(0, 10);
-    
-    return matches.map((card: any) => ({
-      id: `lorcana-${card.Name?.replace(/\s+/g, '-')}-${card.Set_Num || '0'}`,
-      name: card.Name || 'Unknown',
-      category: 'lorcana',
-      set_name: card.Set_Name || 'Disney Lorcana',
-      card_number: card.Card_Num?.toString() || '',
-      rarity: card.Rarity || 'Common',
-      image_url: card.Image || '',
-      market_price: null,
-      source: 'Lorcana API',
-    }));
-  } catch {
-    return [];
-  }
-}
-
-// Search Sports
-async function searchSports(query: string): Promise<SearchResult[]> {
-  try {
-    const response = await fetch(
-      `https://www.thesportsdb.com/api/v1/json/3/searchplayers.php?p=${encodeURIComponent(query)}`
-    );
+    const response = await fetch(`${baseUrl}/api/lorcana?q=${encodeURIComponent(query)}`);
     if (!response.ok) return [];
     
     const data = await response.json();
-    if (!data.player) return [];
+    if (!data.success) return [];
     
-    const sportToCategory: Record<string, string> = {
-      'Baseball': 'sports_baseball',
-      'Basketball': 'sports_basketball',
-      'American Football': 'sports_football',
-      'Ice Hockey': 'sports_hockey',
-      'Soccer': 'sports_soccer',
-      'Golf': 'sports_golf',
-      'Tennis': 'sports_tennis',
-    };
-    
-    return data.player.slice(0, 10).map((player: any) => ({
-      id: `athlete-${player.idPlayer}`,
-      name: player.strPlayer,
-      category: sportToCategory[player.strSport] || 'sports',
-      set_name: `${player.strPlayer} Trading Cards`,
-      card_number: 'Various',
-      rarity: 'Various',
-      image_url: player.strThumb || player.strCutout || '',
+    return (data.cards || []).slice(0, 15).map((card: any) => ({
+      id: `lorcana-${card.id || card.name.replace(/\s+/g, '-')}`,
+      name: card.name,
+      category: 'lorcana',
+      set_name: card.set_name || 'Disney Lorcana',
+      card_number: card.card_number || '',
+      rarity: card.rarity || 'Common',
+      image_url: card.image_url || '',
       market_price: null,
-      source: 'TheSportsDB',
-      type: 'Athlete',
-      team: player.strTeam || player.strSport,
-      sport: player.strSport,
+      source: 'Lorcana',
     }));
-  } catch {
+  } catch (err) {
+    console.error('Lorcana search error:', err);
     return [];
   }
 }
 
-// Main search handler
+// Search Sports via internal API
+async function searchSports(query: string, baseUrl: string): Promise<SearchResult[]> {
+  try {
+    const response = await fetch(`${baseUrl}/api/sports?q=${encodeURIComponent(query)}`);
+    if (!response.ok) return [];
+    
+    const data = await response.json();
+    if (!data.success) return [];
+    
+    return (data.cards || []).slice(0, 15).map((card: any) => ({
+      id: card.id || `athlete-${card.name.replace(/\s+/g, '-')}`,
+      name: card.name,
+      category: card.category || 'sports',
+      set_name: card.set_name || `${card.name} Trading Cards`,
+      card_number: card.card_number || 'Various',
+      rarity: card.rarity || 'Various',
+      image_url: card.image_url || '',
+      market_price: null,
+      source: 'TheSportsDB',
+      type: 'Athlete',
+      team: card.team,
+      sport: card.sport,
+    }));
+  } catch (err) {
+    console.error('Sports search error:', err);
+    return [];
+  }
+}
+
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
   const { searchParams } = new URL(request.url);
@@ -212,25 +192,26 @@ export async function GET(request: NextRequest) {
     }, { status: 400 });
   }
 
+  const baseUrl = getBaseUrl(request);
   const searchAll = !category || category === 'all';
-  const TIMEOUT = 8000;
+  const TIMEOUT = 10000;
   
-  // Run all 5 searches in parallel
+  // Run all 5 searches in parallel using internal APIs
   const [pokemonResults, mtgResults, yugiohResults, lorcanaResults, sportsResults] = await Promise.all([
     (searchAll || category === 'pokemon') 
-      ? withTimeout(searchPokemon(query), TIMEOUT, []) 
+      ? withTimeout(searchPokemon(query, baseUrl), TIMEOUT, []) 
       : Promise.resolve([]),
     (searchAll || category === 'mtg') 
-      ? withTimeout(searchMTG(query), TIMEOUT, []) 
+      ? withTimeout(searchMTG(query, baseUrl), TIMEOUT, []) 
       : Promise.resolve([]),
     (searchAll || category === 'yugioh') 
-      ? withTimeout(searchYuGiOh(query), TIMEOUT, []) 
+      ? withTimeout(searchYuGiOh(query, baseUrl), TIMEOUT, []) 
       : Promise.resolve([]),
     (searchAll || category === 'lorcana') 
-      ? withTimeout(searchLorcana(query), TIMEOUT, []) 
+      ? withTimeout(searchLorcana(query, baseUrl), TIMEOUT, []) 
       : Promise.resolve([]),
     (searchAll || category === 'sports' || category?.startsWith('sports_')) 
-      ? withTimeout(searchSports(query), TIMEOUT, []) 
+      ? withTimeout(searchSports(query, baseUrl), TIMEOUT, []) 
       : Promise.resolve([]),
   ]);
 
@@ -265,6 +246,13 @@ export async function GET(request: NextRequest) {
       yugioh: yugiohResults.length > 0,
       lorcana: lorcanaResults.length > 0,
       sports: sportsResults.length > 0,
+    },
+    coverage: {
+      pokemon: '18,000+ cards from pokemontcg.io',
+      mtg: '27,000+ cards from Scryfall',
+      yugioh: '10,000+ cards from YGOProDeck',
+      lorcana: '1,000+ cards from Lorcana API',
+      sports: '100,000+ athletes from TheSportsDB',
     },
   });
 }
