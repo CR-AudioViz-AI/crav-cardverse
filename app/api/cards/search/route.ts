@@ -42,12 +42,12 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Pro
 async function searchPokemon(query: string): Promise<SearchResult[]> {
   try {
     const response = await fetch(
-      `https://api.pokemontcg.io/v2/cards?q=name:${encodeURIComponent(query)}*&pageSize=15`
+      `https://api.pokemontcg.io/v2/cards?q=name:${encodeURIComponent(query)}*&pageSize=10`
     );
     if (!response.ok) return [];
     
     const data = await response.json();
-    return (data.data || []).slice(0, 15).map((card: any) => ({
+    return (data.data || []).slice(0, 10).map((card: any) => ({
       id: `pokemon-${card.id}`,
       name: card.name,
       category: 'pokemon',
@@ -58,8 +58,7 @@ async function searchPokemon(query: string): Promise<SearchResult[]> {
       market_price: card.cardmarket?.prices?.averageSellPrice || null,
       source: 'Pokemon TCG',
     }));
-  } catch (e) {
-    console.error('Pokemon search error:', e);
+  } catch {
     return [];
   }
 }
@@ -73,7 +72,7 @@ async function searchMTG(query: string): Promise<SearchResult[]> {
     if (!response.ok) return [];
     
     const data = await response.json();
-    return (data.data || []).slice(0, 15).map((card: any) => ({
+    return (data.data || []).slice(0, 10).map((card: any) => ({
       id: `mtg-${card.id}`,
       name: card.name,
       category: 'mtg',
@@ -84,8 +83,7 @@ async function searchMTG(query: string): Promise<SearchResult[]> {
       market_price: card.prices?.usd ? parseFloat(card.prices.usd) : null,
       source: 'Scryfall',
     }));
-  } catch (e) {
-    console.error('MTG search error:', e);
+  } catch {
     return [];
   }
 }
@@ -94,14 +92,14 @@ async function searchMTG(query: string): Promise<SearchResult[]> {
 async function searchYuGiOh(query: string): Promise<SearchResult[]> {
   try {
     const response = await fetch(
-      `https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}&num=15&offset=0`
+      `https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}&num=10&offset=0`
     );
     if (!response.ok) return [];
     
     const data = await response.json();
     if (data.error) return [];
     
-    return (data.data || []).slice(0, 15).map((card: any) => ({
+    return (data.data || []).slice(0, 10).map((card: any) => ({
       id: `yugioh-${card.id}`,
       name: card.name,
       category: 'yugioh',
@@ -112,51 +110,39 @@ async function searchYuGiOh(query: string): Promise<SearchResult[]> {
       market_price: card.card_prices?.[0]?.tcgplayer_price ? parseFloat(card.card_prices[0].tcgplayer_price) : null,
       source: 'YGOProDeck',
     }));
-  } catch (e) {
-    console.error('Yu-Gi-Oh search error:', e);
+  } catch {
     return [];
   }
 }
 
-// Lorcana card cache (fetched once, filtered locally)
+// Lorcana cache
 let lorcanaCache: any[] | null = null;
 let lorcanaCacheTime = 0;
-const LORCANA_CACHE_TTL = 3600000; // 1 hour
-
-async function getLorcanaCards(): Promise<any[]> {
-  const now = Date.now();
-  if (lorcanaCache && (now - lorcanaCacheTime) < LORCANA_CACHE_TTL) {
-    return lorcanaCache;
-  }
-  
-  try {
-    const response = await fetch('https://api.lorcana-api.com/cards/all');
-    if (!response.ok) return lorcanaCache || [];
-    
-    const data = await response.json();
-    lorcanaCache = data || [];
-    lorcanaCacheTime = now;
-    return lorcanaCache;
-  } catch (e) {
-    console.error('Lorcana fetch error:', e);
-    return lorcanaCache || [];
-  }
-}
 
 // Search Lorcana (Disney TCG)
 async function searchLorcana(query: string): Promise<SearchResult[]> {
   try {
-    const allCards = await getLorcanaCards();
-    const queryLower = query.toLowerCase();
+    // Check cache (1 hour TTL)
+    const now = Date.now();
+    if (!lorcanaCache || (now - lorcanaCacheTime) > 3600000) {
+      const response = await fetch('https://api.lorcana-api.com/cards/all');
+      if (response.ok) {
+        lorcanaCache = await response.json();
+        lorcanaCacheTime = now;
+      }
+    }
     
-    const matches = allCards.filter((card: any) => {
+    if (!lorcanaCache) return [];
+    
+    const queryLower = query.toLowerCase();
+    const matches = lorcanaCache.filter((card: any) => {
       const name = (card.Name || '').toLowerCase();
       const title = (card.Title || '').toLowerCase();
       return name.includes(queryLower) || title.includes(queryLower);
-    }).slice(0, 15);
+    }).slice(0, 10);
     
     return matches.map((card: any) => ({
-      id: `lorcana-${card.Name?.replace(/\s+/g, '-')}-${card.Set_Num || 'unknown'}`,
+      id: `lorcana-${card.Name?.replace(/\s+/g, '-')}-${card.Set_Num || '0'}`,
       name: card.Name || 'Unknown',
       category: 'lorcana',
       set_name: card.Set_Name || 'Disney Lorcana',
@@ -166,13 +152,12 @@ async function searchLorcana(query: string): Promise<SearchResult[]> {
       market_price: null,
       source: 'Lorcana API',
     }));
-  } catch (e) {
-    console.error('Lorcana search error:', e);
+  } catch {
     return [];
   }
 }
 
-// Search Sports (TheSportsDB)
+// Search Sports
 async function searchSports(query: string): Promise<SearchResult[]> {
   try {
     const response = await fetch(
@@ -191,11 +176,9 @@ async function searchSports(query: string): Promise<SearchResult[]> {
       'Soccer': 'sports_soccer',
       'Golf': 'sports_golf',
       'Tennis': 'sports_tennis',
-      'Boxing': 'sports_boxing',
-      'MMA': 'sports_mma',
     };
     
-    return data.player.slice(0, 15).map((player: any) => ({
+    return data.player.slice(0, 10).map((player: any) => ({
       id: `athlete-${player.idPlayer}`,
       name: player.strPlayer,
       category: sportToCategory[player.strSport] || 'sports',
@@ -209,8 +192,7 @@ async function searchSports(query: string): Promise<SearchResult[]> {
       team: player.strTeam || player.strSport,
       sport: player.strSport,
     }));
-  } catch (e) {
-    console.error('Sports search error:', e);
+  } catch {
     return [];
   }
 }
@@ -221,7 +203,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('q') || searchParams.get('query');
   const category = searchParams.get('category')?.toLowerCase();
-  const limit = Math.min(parseInt(searchParams.get('limit') || '30'), 100);
+  const limit = Math.min(parseInt(searchParams.get('limit') || '30'), 50);
 
   if (!query || query.length < 2) {
     return NextResponse.json({
@@ -231,9 +213,9 @@ export async function GET(request: NextRequest) {
   }
 
   const searchAll = !category || category === 'all';
-  const TIMEOUT = 10000; // 10 second timeout per source
+  const TIMEOUT = 8000;
   
-  // Run ALL 5 searches in parallel with individual timeouts
+  // Run all 5 searches in parallel
   const [pokemonResults, mtgResults, yugiohResults, lorcanaResults, sportsResults] = await Promise.all([
     (searchAll || category === 'pokemon') 
       ? withTimeout(searchPokemon(query), TIMEOUT, []) 
@@ -253,15 +235,9 @@ export async function GET(request: NextRequest) {
   ]);
 
   // Combine all results
-  let allResults = [
-    ...pokemonResults, 
-    ...mtgResults, 
-    ...yugiohResults, 
-    ...lorcanaResults,
-    ...sportsResults
-  ];
+  let allResults = [...pokemonResults, ...mtgResults, ...yugiohResults, ...lorcanaResults, ...sportsResults];
 
-  // Sort: exact matches first, then starts-with, then alphabetical
+  // Sort: exact matches first
   const queryLower = query.toLowerCase();
   allResults.sort((a, b) => {
     const aName = a.name.toLowerCase();
@@ -290,14 +266,7 @@ export async function GET(request: NextRequest) {
       lorcana: lorcanaResults.length > 0,
       sports: sportsResults.length > 0,
     },
-    coverage: {
-      pokemon: '18,000+ cards from pokemontcg.io',
-      mtg: '27,000+ cards from Scryfall',
-      yugioh: '10,000+ cards from YGOProDeck',
-      lorcana: '1,000+ cards from Lorcana API',
-      sports: '100,000+ athletes from TheSportsDB',
-    },
   });
 }
 
-export const maxDuration = 30;
+export const maxDuration = 15;
