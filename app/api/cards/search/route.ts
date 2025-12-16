@@ -1,6 +1,6 @@
 // ============================================================================
-// UNIFIED CARD SEARCH API - FAST FIRST
-// Returns results as soon as ANY source responds
+// UNIFIED CARD SEARCH API - ALL 5 SOURCES
+// Pokemon, MTG, Yu-Gi-Oh, Lorcana, Sports
 // CravCards - CR AudioViz AI, LLC
 // Fixed: December 15, 2025
 // ============================================================================
@@ -38,16 +38,16 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Pro
   ]);
 }
 
-// Search Pokemon TCG (fastest API ~3-5s)
+// Search Pokemon TCG
 async function searchPokemon(query: string): Promise<SearchResult[]> {
   try {
     const response = await fetch(
-      `https://api.pokemontcg.io/v2/cards?q=name:${encodeURIComponent(query)}*&pageSize=10`
+      `https://api.pokemontcg.io/v2/cards?q=name:${encodeURIComponent(query)}*&pageSize=15`
     );
     if (!response.ok) return [];
     
     const data = await response.json();
-    return (data.data || []).slice(0, 10).map((card: any) => ({
+    return (data.data || []).slice(0, 15).map((card: any) => ({
       id: `pokemon-${card.id}`,
       name: card.name,
       category: 'pokemon',
@@ -58,12 +58,13 @@ async function searchPokemon(query: string): Promise<SearchResult[]> {
       market_price: card.cardmarket?.prices?.averageSellPrice || null,
       source: 'Pokemon TCG',
     }));
-  } catch {
+  } catch (e) {
+    console.error('Pokemon search error:', e);
     return [];
   }
 }
 
-// Search Magic: The Gathering (fast API ~1-2s)
+// Search Magic: The Gathering
 async function searchMTG(query: string): Promise<SearchResult[]> {
   try {
     const response = await fetch(
@@ -72,7 +73,7 @@ async function searchMTG(query: string): Promise<SearchResult[]> {
     if (!response.ok) return [];
     
     const data = await response.json();
-    return (data.data || []).slice(0, 10).map((card: any) => ({
+    return (data.data || []).slice(0, 15).map((card: any) => ({
       id: `mtg-${card.id}`,
       name: card.name,
       category: 'mtg',
@@ -83,23 +84,24 @@ async function searchMTG(query: string): Promise<SearchResult[]> {
       market_price: card.prices?.usd ? parseFloat(card.prices.usd) : null,
       source: 'Scryfall',
     }));
-  } catch {
+  } catch (e) {
+    console.error('MTG search error:', e);
     return [];
   }
 }
 
-// Search Yu-Gi-Oh (fast API ~1s)
+// Search Yu-Gi-Oh
 async function searchYuGiOh(query: string): Promise<SearchResult[]> {
   try {
     const response = await fetch(
-      `https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}&num=10&offset=0`
+      `https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}&num=15&offset=0`
     );
     if (!response.ok) return [];
     
     const data = await response.json();
     if (data.error) return [];
     
-    return (data.data || []).slice(0, 10).map((card: any) => ({
+    return (data.data || []).slice(0, 15).map((card: any) => ({
       id: `yugioh-${card.id}`,
       name: card.name,
       category: 'yugioh',
@@ -110,12 +112,67 @@ async function searchYuGiOh(query: string): Promise<SearchResult[]> {
       market_price: card.card_prices?.[0]?.tcgplayer_price ? parseFloat(card.card_prices[0].tcgplayer_price) : null,
       source: 'YGOProDeck',
     }));
-  } catch {
+  } catch (e) {
+    console.error('Yu-Gi-Oh search error:', e);
     return [];
   }
 }
 
-// Search Sports (usually fast ~1-2s)
+// Lorcana card cache (fetched once, filtered locally)
+let lorcanaCache: any[] | null = null;
+let lorcanaCacheTime = 0;
+const LORCANA_CACHE_TTL = 3600000; // 1 hour
+
+async function getLorcanaCards(): Promise<any[]> {
+  const now = Date.now();
+  if (lorcanaCache && (now - lorcanaCacheTime) < LORCANA_CACHE_TTL) {
+    return lorcanaCache;
+  }
+  
+  try {
+    const response = await fetch('https://api.lorcana-api.com/cards/all');
+    if (!response.ok) return lorcanaCache || [];
+    
+    const data = await response.json();
+    lorcanaCache = data || [];
+    lorcanaCacheTime = now;
+    return lorcanaCache;
+  } catch (e) {
+    console.error('Lorcana fetch error:', e);
+    return lorcanaCache || [];
+  }
+}
+
+// Search Lorcana (Disney TCG)
+async function searchLorcana(query: string): Promise<SearchResult[]> {
+  try {
+    const allCards = await getLorcanaCards();
+    const queryLower = query.toLowerCase();
+    
+    const matches = allCards.filter((card: any) => {
+      const name = (card.Name || '').toLowerCase();
+      const title = (card.Title || '').toLowerCase();
+      return name.includes(queryLower) || title.includes(queryLower);
+    }).slice(0, 15);
+    
+    return matches.map((card: any) => ({
+      id: `lorcana-${card.Name?.replace(/\s+/g, '-')}-${card.Set_Num || 'unknown'}`,
+      name: card.Name || 'Unknown',
+      category: 'lorcana',
+      set_name: card.Set_Name || 'Disney Lorcana',
+      card_number: card.Card_Num?.toString() || '',
+      rarity: card.Rarity || 'Common',
+      image_url: card.Image || '',
+      market_price: null,
+      source: 'Lorcana API',
+    }));
+  } catch (e) {
+    console.error('Lorcana search error:', e);
+    return [];
+  }
+}
+
+// Search Sports (TheSportsDB)
 async function searchSports(query: string): Promise<SearchResult[]> {
   try {
     const response = await fetch(
@@ -132,9 +189,13 @@ async function searchSports(query: string): Promise<SearchResult[]> {
       'American Football': 'sports_football',
       'Ice Hockey': 'sports_hockey',
       'Soccer': 'sports_soccer',
+      'Golf': 'sports_golf',
+      'Tennis': 'sports_tennis',
+      'Boxing': 'sports_boxing',
+      'MMA': 'sports_mma',
     };
     
-    return data.player.slice(0, 10).map((player: any) => ({
+    return data.player.slice(0, 15).map((player: any) => ({
       id: `athlete-${player.idPlayer}`,
       name: player.strPlayer,
       category: sportToCategory[player.strSport] || 'sports',
@@ -148,18 +209,19 @@ async function searchSports(query: string): Promise<SearchResult[]> {
       team: player.strTeam || player.strSport,
       sport: player.strSport,
     }));
-  } catch {
+  } catch (e) {
+    console.error('Sports search error:', e);
     return [];
   }
 }
 
-// Main search handler - returns quickly with whatever results we get
+// Main search handler
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('q') || searchParams.get('query');
   const category = searchParams.get('category')?.toLowerCase();
-  const limit = Math.min(parseInt(searchParams.get('limit') || '30'), 50);
+  const limit = Math.min(parseInt(searchParams.get('limit') || '30'), 100);
 
   if (!query || query.length < 2) {
     return NextResponse.json({
@@ -169,10 +231,10 @@ export async function GET(request: NextRequest) {
   }
 
   const searchAll = !category || category === 'all';
-  const TIMEOUT = 8000; // 8 second timeout per source
+  const TIMEOUT = 10000; // 10 second timeout per source
   
-  // Run all searches in parallel with individual timeouts
-  const [pokemonResults, mtgResults, yugiohResults, sportsResults] = await Promise.all([
+  // Run ALL 5 searches in parallel with individual timeouts
+  const [pokemonResults, mtgResults, yugiohResults, lorcanaResults, sportsResults] = await Promise.all([
     (searchAll || category === 'pokemon') 
       ? withTimeout(searchPokemon(query), TIMEOUT, []) 
       : Promise.resolve([]),
@@ -182,15 +244,24 @@ export async function GET(request: NextRequest) {
     (searchAll || category === 'yugioh') 
       ? withTimeout(searchYuGiOh(query), TIMEOUT, []) 
       : Promise.resolve([]),
+    (searchAll || category === 'lorcana') 
+      ? withTimeout(searchLorcana(query), TIMEOUT, []) 
+      : Promise.resolve([]),
     (searchAll || category === 'sports' || category?.startsWith('sports_')) 
       ? withTimeout(searchSports(query), TIMEOUT, []) 
       : Promise.resolve([]),
   ]);
 
   // Combine all results
-  let allResults = [...pokemonResults, ...mtgResults, ...yugiohResults, ...sportsResults];
+  let allResults = [
+    ...pokemonResults, 
+    ...mtgResults, 
+    ...yugiohResults, 
+    ...lorcanaResults,
+    ...sportsResults
+  ];
 
-  // Sort: exact matches first
+  // Sort: exact matches first, then starts-with, then alphabetical
   const queryLower = query.toLowerCase();
   allResults.sort((a, b) => {
     const aName = a.name.toLowerCase();
@@ -216,9 +287,17 @@ export async function GET(request: NextRequest) {
       pokemon: pokemonResults.length > 0,
       mtg: mtgResults.length > 0,
       yugioh: yugiohResults.length > 0,
+      lorcana: lorcanaResults.length > 0,
       sports: sportsResults.length > 0,
+    },
+    coverage: {
+      pokemon: '18,000+ cards from pokemontcg.io',
+      mtg: '27,000+ cards from Scryfall',
+      yugioh: '10,000+ cards from YGOProDeck',
+      lorcana: '1,000+ cards from Lorcana API',
+      sports: '100,000+ athletes from TheSportsDB',
     },
   });
 }
 
-export const maxDuration = 15;
+export const maxDuration = 30;
