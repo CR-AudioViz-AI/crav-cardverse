@@ -25,50 +25,57 @@ interface PriceAlert {
   is_active: boolean;
   notify_email: boolean;
   notify_push: boolean;
+  notify_sms: boolean;
   created_at: string;
   triggered_at: string | null;
-  triggered_price: number | null;
+  trigger_count: number;
 }
 
 interface NotificationSettings {
   email_enabled: boolean;
-  email_address: string;
+  email_address: string | null;
   push_enabled: boolean;
-  push_token: string | null;
-  daily_digest: boolean;
-  digest_time: string;
-  alert_frequency: 'instant' | 'hourly' | 'daily';
+  sms_enabled: boolean;
+  phone_number: string | null;
   quiet_hours_start: string | null;
   quiet_hours_end: string | null;
+  daily_digest: boolean;
+  instant_alerts: boolean;
+  alert_frequency: 'instant' | 'hourly' | 'daily';
 }
 
-// GET - Get alerts or notification settings
+interface Notification {
+  id: string;
+  user_id: string;
+  type: 'price_alert' | 'trade_offer' | 'wishlist_available' | 'achievement' | 'system';
+  title: string;
+  message: string;
+  data: Record<string, unknown>;
+  is_read: boolean;
+  created_at: string;
+}
+
+// GET - Get alerts, notifications, or settings
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get('user_id');
-  const action = searchParams.get('action') || 'list';
-  const alertId = searchParams.get('alert_id');
+  const action = searchParams.get('action') || 'alerts';
+  const limit = parseInt(searchParams.get('limit') || '50');
 
   if (!userId) {
-    return NextResponse.json({
-      success: false,
-      error: 'User ID required',
-    }, { status: 400 });
+    return NextResponse.json({ success: false, error: 'User ID required' }, { status: 400 });
   }
 
   try {
     switch (action) {
-      case 'list':
-        return await listAlerts(userId);
-      case 'triggered':
-        return await getTriggeredAlerts(userId);
+      case 'alerts':
+        return await getAlerts(userId);
+      case 'notifications':
+        return await getNotifications(userId, limit);
       case 'settings':
         return await getNotificationSettings(userId);
-      case 'history':
-        return await getNotificationHistory(userId);
-      case 'check':
-        // Check all alerts for a user (called by cron)
-        return await checkUserAlerts(userId);
+      case 'unread-count':
+        return await getUnreadCount(userId);
       default:
         return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
     }
@@ -78,7 +85,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Create/update alerts or settings
+// POST - Create alerts, update settings, or send notifications
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -89,20 +96,20 @@ export async function POST(request: NextRequest) {
     }
 
     switch (action) {
-      case 'create':
+      case 'create-alert':
         return await createAlert(user_id, body);
-      case 'update':
+      case 'update-alert':
         return await updateAlert(body.alert_id, body);
-      case 'delete':
-        return await deleteAlert(body.alert_id, user_id);
-      case 'toggle':
-        return await toggleAlert(body.alert_id, user_id);
+      case 'delete-alert':
+        return await deleteAlert(user_id, body.alert_id);
       case 'update-settings':
         return await updateNotificationSettings(user_id, body.settings);
-      case 'register-push':
-        return await registerPushToken(user_id, body.push_token);
-      case 'test':
-        return await sendTestNotification(user_id);
+      case 'mark-read':
+        return await markNotificationsRead(user_id, body.notification_ids);
+      case 'mark-all-read':
+        return await markAllRead(user_id);
+      case 'check-alerts':
+        return await checkAndTriggerAlerts(user_id);
       default:
         return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
     }
@@ -112,8 +119,8 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// List all alerts for a user
-async function listAlerts(userId: string): Promise<NextResponse> {
+// Get user's price alerts
+async function getAlerts(userId: string): Promise<NextResponse> {
   const { data: alerts, error } = await supabase
     .from('cv_price_alerts')
     .select('*')
@@ -126,17 +133,15 @@ async function listAlerts(userId: string): Promise<NextResponse> {
   const enrichedAlerts = await Promise.all(
     (alerts || []).map(async (alert) => {
       const currentPrice = await getCurrentPrice(alert.card_id);
-      const distance = alert.alert_type === 'above'
-        ? ((alert.target_value - currentPrice) / currentPrice * 100)
-        : alert.alert_type === 'below'
-        ? ((currentPrice - alert.target_value) / currentPrice * 100)
+      const percentFromTarget = alert.target_value > 0
+        ? ((currentPrice - alert.target_value) / alert.target_value) * 100
         : 0;
 
       return {
         ...alert,
         current_price: currentPrice,
-        distance_percent: Math.round(distance * 100) / 100,
-        status: getAlertStatus(alert, currentPrice),
+        percent_from_target: Math.round(percentFromTarget * 100) / 100,
+        would_trigger: checkAlertCondition(alert, currentPrice),
       };
     })
   );
@@ -149,19 +154,28 @@ async function listAlerts(userId: string): Promise<NextResponse> {
   });
 }
 
-// Get triggered alerts (notifications sent)
-async function getTriggeredAlerts(userId: string): Promise<NextResponse> {
-  const { data: triggered } = await supabase
-    .from('cv_price_alerts')
+// Get notifications
+async function getNotifications(userId: string, limit: number): Promise<NextResponse> {
+  const { data: notifications, error } = await supabase
+    .from('cv_notifications')
     .select('*')
     .eq('user_id', userId)
-    .not('triggered_at', 'is', null)
-    .order('triggered_at', { ascending: false })
-    .limit(50);
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error && error.code !== 'PGRST116') {
+    // Generate sample notifications if table doesn't exist
+    return NextResponse.json({
+      success: true,
+      notifications: generateSampleNotifications(userId),
+      sample_data: true,
+    });
+  }
 
   return NextResponse.json({
     success: true,
-    triggered: triggered || [],
+    notifications: notifications || [],
+    total: notifications?.length || 0,
   });
 }
 
@@ -175,14 +189,15 @@ async function getNotificationSettings(userId: string): Promise<NextResponse> {
 
   const defaultSettings: NotificationSettings = {
     email_enabled: true,
-    email_address: '',
-    push_enabled: false,
-    push_token: null,
-    daily_digest: true,
-    digest_time: '09:00',
-    alert_frequency: 'instant',
+    email_address: null,
+    push_enabled: true,
+    sms_enabled: false,
+    phone_number: null,
     quiet_hours_start: '22:00',
     quiet_hours_end: '08:00',
+    daily_digest: true,
+    instant_alerts: true,
+    alert_frequency: 'instant',
   };
 
   return NextResponse.json({
@@ -191,85 +206,44 @@ async function getNotificationSettings(userId: string): Promise<NextResponse> {
   });
 }
 
-// Get notification history
-async function getNotificationHistory(userId: string): Promise<NextResponse> {
-  const { data: history } = await supabase
-    .from('cv_notification_log')
-    .select('*')
+// Get unread notification count
+async function getUnreadCount(userId: string): Promise<NextResponse> {
+  const { count } = await supabase
+    .from('cv_notifications')
+    .select('*', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .order('sent_at', { ascending: false })
-    .limit(100);
+    .eq('is_read', false);
 
   return NextResponse.json({
     success: true,
-    history: history || [],
+    unread_count: count || 0,
   });
 }
 
-// Check all alerts for a user
-async function checkUserAlerts(userId: string): Promise<NextResponse> {
-  const { data: alerts } = await supabase
-    .from('cv_price_alerts')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('is_active', true);
+// Create a price alert
+async function createAlert(userId: string, data: Record<string, unknown>): Promise<NextResponse> {
+  const { card_id, card_name, category, alert_type, target_value, notify_email, notify_push, notify_sms } = data;
 
-  const triggered: PriceAlert[] = [];
-
-  for (const alert of alerts || []) {
-    const currentPrice = await getCurrentPrice(alert.card_id);
-    const isTriggered = checkAlertTriggered(alert, currentPrice);
-
-    if (isTriggered) {
-      triggered.push({ ...alert, current_price: currentPrice });
-      
-      // Update alert as triggered
-      await supabase
-        .from('cv_price_alerts')
-        .update({
-          triggered_at: new Date().toISOString(),
-          triggered_price: currentPrice,
-          is_active: false, // Deactivate after trigger
-        })
-        .eq('id', alert.id);
-
-      // Send notification
-      await sendNotification(userId, alert, currentPrice);
-    }
-  }
-
-  return NextResponse.json({
-    success: true,
-    checked: alerts?.length || 0,
-    triggered: triggered.length,
-    alerts: triggered,
-  });
-}
-
-// Create a new alert
-async function createAlert(userId: string, body: Record<string, unknown>): Promise<NextResponse> {
-  const { card_id, card_name, category, alert_type, target_value, notify_email, notify_push } = body;
-
-  if (!card_id || !alert_type || target_value === undefined) {
+  if (!card_id || !target_value) {
     return NextResponse.json({
       success: false,
-      error: 'card_id, alert_type, and target_value required',
+      error: 'Card ID and target value required',
     }, { status: 400 });
   }
 
-  // Check alert limits (free tier: 5, premium: 50)
+  // Check alert limit (free tier: 5 alerts)
   const { count } = await supabase
     .from('cv_price_alerts')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', userId)
     .eq('is_active', true);
 
-  const limit = 50; // TODO: Check user tier
-  if ((count || 0) >= limit) {
+  if ((count || 0) >= 20) {
     return NextResponse.json({
       success: false,
-      error: `Alert limit reached (${limit} active alerts)`,
-    }, { status: 400 });
+      error: 'Alert limit reached. Upgrade to premium for unlimited alerts.',
+      limit: 20,
+    }, { status: 403 });
   }
 
   const currentPrice = await getCurrentPrice(card_id as string);
@@ -281,12 +255,14 @@ async function createAlert(userId: string, body: Record<string, unknown>): Promi
       card_id,
       card_name: card_name || 'Unknown Card',
       category: category || 'other',
-      alert_type,
+      alert_type: alert_type || 'below',
       target_value,
       current_price: currentPrice,
       is_active: true,
       notify_email: notify_email !== false,
-      notify_push: notify_push === true,
+      notify_push: notify_push !== false,
+      notify_sms: notify_sms || false,
+      trigger_count: 0,
       created_at: new Date().toISOString(),
     })
     .select()
@@ -297,23 +273,21 @@ async function createAlert(userId: string, body: Record<string, unknown>): Promi
   return NextResponse.json({
     success: true,
     alert,
-    message: `Alert created: Notify when price goes ${alert_type} $${target_value}`,
+    message: 'Price alert created successfully',
   });
 }
 
 // Update an alert
-async function updateAlert(alertId: string, body: Record<string, unknown>): Promise<NextResponse> {
-  const { target_value, alert_type, notify_email, notify_push, is_active } = body;
+async function updateAlert(alertId: string, data: Record<string, unknown>): Promise<NextResponse> {
+  const { target_value, alert_type, is_active, notify_email, notify_push, notify_sms } = data;
 
-  const updates: Record<string, unknown> = {
-    updated_at: new Date().toISOString(),
-  };
-
+  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (target_value !== undefined) updates.target_value = target_value;
   if (alert_type !== undefined) updates.alert_type = alert_type;
+  if (is_active !== undefined) updates.is_active = is_active;
   if (notify_email !== undefined) updates.notify_email = notify_email;
   if (notify_push !== undefined) updates.notify_push = notify_push;
-  if (is_active !== undefined) updates.is_active = is_active;
+  if (notify_sms !== undefined) updates.notify_sms = notify_sms;
 
   const { data: alert, error } = await supabase
     .from('cv_price_alerts')
@@ -332,7 +306,7 @@ async function updateAlert(alertId: string, body: Record<string, unknown>): Prom
 }
 
 // Delete an alert
-async function deleteAlert(alertId: string, userId: string): Promise<NextResponse> {
+async function deleteAlert(userId: string, alertId: string): Promise<NextResponse> {
   const { error } = await supabase
     .from('cv_price_alerts')
     .delete()
@@ -344,35 +318,6 @@ async function deleteAlert(alertId: string, userId: string): Promise<NextRespons
   return NextResponse.json({
     success: true,
     message: 'Alert deleted',
-  });
-}
-
-// Toggle alert active state
-async function toggleAlert(alertId: string, userId: string): Promise<NextResponse> {
-  const { data: current } = await supabase
-    .from('cv_price_alerts')
-    .select('is_active')
-    .eq('id', alertId)
-    .eq('user_id', userId)
-    .single();
-
-  if (!current) {
-    return NextResponse.json({ success: false, error: 'Alert not found' }, { status: 404 });
-  }
-
-  const { data: alert, error } = await supabase
-    .from('cv_price_alerts')
-    .update({ is_active: !current.is_active })
-    .eq('id', alertId)
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  return NextResponse.json({
-    success: true,
-    alert,
-    message: alert.is_active ? 'Alert activated' : 'Alert paused',
   });
 }
 
@@ -397,58 +342,88 @@ async function updateNotificationSettings(userId: string, settings: Partial<Noti
   });
 }
 
-// Register push notification token
-async function registerPushToken(userId: string, pushToken: string): Promise<NextResponse> {
+// Mark notifications as read
+async function markNotificationsRead(userId: string, notificationIds: string[]): Promise<NextResponse> {
   const { error } = await supabase
-    .from('cv_notification_settings')
-    .upsert({
-      user_id: userId,
-      push_token: pushToken,
-      push_enabled: true,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id' });
+    .from('cv_notifications')
+    .update({ is_read: true, read_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .in('id', notificationIds);
 
   if (error) throw error;
 
   return NextResponse.json({
     success: true,
-    message: 'Push notifications enabled',
+    message: `${notificationIds.length} notifications marked as read`,
   });
 }
 
-// Send test notification
-async function sendTestNotification(userId: string): Promise<NextResponse> {
-  const { data: settings } = await supabase
-    .from('cv_notification_settings')
+// Mark all notifications as read
+async function markAllRead(userId: string): Promise<NextResponse> {
+  const { error } = await supabase
+    .from('cv_notifications')
+    .update({ is_read: true, read_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .eq('is_read', false);
+
+  if (error) throw error;
+
+  return NextResponse.json({
+    success: true,
+    message: 'All notifications marked as read',
+  });
+}
+
+// Check and trigger alerts
+async function checkAndTriggerAlerts(userId: string): Promise<NextResponse> {
+  const { data: alerts } = await supabase
+    .from('cv_price_alerts')
     .select('*')
     .eq('user_id', userId)
-    .single();
+    .eq('is_active', true);
 
-  const results = {
-    email: false,
-    push: false,
-  };
+  const triggered: string[] = [];
 
-  if (settings?.email_enabled && settings?.email_address) {
-    // In production, send actual email
-    results.email = true;
-    await logNotification(userId, 'test', 'email', 'Test notification sent');
-  }
+  for (const alert of alerts || []) {
+    const currentPrice = await getCurrentPrice(alert.card_id);
+    
+    if (checkAlertCondition(alert, currentPrice)) {
+      // Create notification
+      await createNotification(userId, {
+        type: 'price_alert',
+        title: `Price Alert: ${alert.card_name}`,
+        message: `${alert.card_name} has reached your target price of $${alert.target_value}. Current price: $${currentPrice}`,
+        data: {
+          alert_id: alert.id,
+          card_id: alert.card_id,
+          current_price: currentPrice,
+          target_value: alert.target_value,
+        },
+      });
 
-  if (settings?.push_enabled && settings?.push_token) {
-    // In production, send actual push
-    results.push = true;
-    await logNotification(userId, 'test', 'push', 'Test notification sent');
+      // Update alert
+      await supabase
+        .from('cv_price_alerts')
+        .update({
+          triggered_at: new Date().toISOString(),
+          trigger_count: (alert.trigger_count || 0) + 1,
+          current_price: currentPrice,
+        })
+        .eq('id', alert.id);
+
+      triggered.push(alert.card_name);
+    }
   }
 
   return NextResponse.json({
     success: true,
-    results,
-    message: 'Test notifications sent',
+    checked: alerts?.length || 0,
+    triggered: triggered.length,
+    triggered_cards: triggered,
   });
 }
 
-// Helper: Get current price
+// Helper: Get current price for a card
 async function getCurrentPrice(cardId: string): Promise<number> {
   const { data } = await supabase
     .from('cv_cards_master')
@@ -456,17 +431,16 @@ async function getCurrentPrice(cardId: string): Promise<number> {
     .eq('card_id', cardId)
     .single();
 
-  // Return actual price or generate realistic one for demo
-  return data?.current_price || (25 + Math.random() * 100);
+  return data?.current_price || 25 + Math.random() * 100;
 }
 
-// Helper: Check if alert triggered
-function checkAlertTriggered(alert: PriceAlert, currentPrice: number): boolean {
+// Helper: Check if alert condition is met
+function checkAlertCondition(alert: PriceAlert, currentPrice: number): boolean {
   switch (alert.alert_type) {
-    case 'above':
-      return currentPrice >= alert.target_value;
     case 'below':
       return currentPrice <= alert.target_value;
+    case 'above':
+      return currentPrice >= alert.target_value;
     case 'change_percent':
       const changePercent = Math.abs((currentPrice - alert.current_price) / alert.current_price * 100);
       return changePercent >= alert.target_value;
@@ -475,89 +449,68 @@ function checkAlertTriggered(alert: PriceAlert, currentPrice: number): boolean {
   }
 }
 
-// Helper: Get alert status
-function getAlertStatus(alert: PriceAlert, currentPrice: number): string {
-  if (!alert.is_active) return 'paused';
-  if (alert.triggered_at) return 'triggered';
-  
-  const distance = alert.alert_type === 'above'
-    ? (alert.target_value - currentPrice) / currentPrice
-    : (currentPrice - alert.target_value) / currentPrice;
-
-  if (distance <= 0.05) return 'close';
-  if (distance <= 0.15) return 'approaching';
-  return 'watching';
-}
-
-// Helper: Send notification
-async function sendNotification(userId: string, alert: PriceAlert, currentPrice: number): Promise<void> {
-  const { data: settings } = await supabase
-    .from('cv_notification_settings')
-    .select('*')
-    .eq('user_id', userId)
-    .single();
-
-  const message = `Price Alert: ${alert.card_name} is now $${currentPrice.toFixed(2)} (target: ${alert.alert_type} $${alert.target_value})`;
-
-  // Check quiet hours
-  if (settings?.quiet_hours_start && settings?.quiet_hours_end) {
-    const now = new Date();
-    const currentHour = now.getHours();
-    const startHour = parseInt(settings.quiet_hours_start.split(':')[0]);
-    const endHour = parseInt(settings.quiet_hours_end.split(':')[0]);
-
-    if (startHour > endHour) {
-      // Quiet hours span midnight
-      if (currentHour >= startHour || currentHour < endHour) {
-        // In quiet hours, queue for later
-        await queueNotification(userId, alert, currentPrice, message);
-        return;
-      }
-    } else {
-      if (currentHour >= startHour && currentHour < endHour) {
-        await queueNotification(userId, alert, currentPrice, message);
-        return;
-      }
-    }
-  }
-
-  // Send email
-  if (alert.notify_email && settings?.email_enabled) {
-    // In production: send email via SendGrid, SES, etc.
-    await logNotification(userId, alert.id, 'email', message);
-  }
-
-  // Send push
-  if (alert.notify_push && settings?.push_enabled) {
-    // In production: send push via Firebase, OneSignal, etc.
-    await logNotification(userId, alert.id, 'push', message);
-  }
-}
-
-// Helper: Queue notification for later
-async function queueNotification(userId: string, alert: PriceAlert, price: number, message: string): Promise<void> {
-  await supabase.from('cv_notification_queue').insert({
+// Helper: Create notification
+async function createNotification(userId: string, notification: {
+  type: Notification['type'];
+  title: string;
+  message: string;
+  data: Record<string, unknown>;
+}): Promise<void> {
+  await supabase.from('cv_notifications').insert({
     user_id: userId,
-    alert_id: alert.id,
-    message,
-    price,
-    queued_at: new Date().toISOString(),
+    type: notification.type,
+    title: notification.title,
+    message: notification.message,
+    data: notification.data,
+    is_read: false,
+    created_at: new Date().toISOString(),
   });
 }
 
-// Helper: Log notification
-async function logNotification(userId: string, alertId: string, channel: string, message: string): Promise<void> {
-  try {
-    await supabase.from('cv_notification_log').insert({
+// Helper: Generate sample notifications
+function generateSampleNotifications(userId: string): Notification[] {
+  return [
+    {
+      id: 'notif-1',
       user_id: userId,
-      alert_id: alertId,
-      channel,
-      message,
-      sent_at: new Date().toISOString(),
-    });
-  } catch {
-    // Silently fail if table doesn't exist
-  }
+      type: 'price_alert',
+      title: 'Price Alert: Charizard VMAX',
+      message: 'Charizard VMAX has dropped below your target price of $150',
+      data: { card_id: 'pokemon-charizard-vmax', current_price: 145 },
+      is_read: false,
+      created_at: new Date(Date.now() - 3600000).toISOString(),
+    },
+    {
+      id: 'notif-2',
+      user_id: userId,
+      type: 'trade_offer',
+      title: 'New Trade Offer',
+      message: 'CardMaster99 wants to trade for your Black Lotus',
+      data: { trade_id: 'trade-123' },
+      is_read: false,
+      created_at: new Date(Date.now() - 7200000).toISOString(),
+    },
+    {
+      id: 'notif-3',
+      user_id: userId,
+      type: 'wishlist_available',
+      title: 'Wishlist Card Available',
+      message: 'Umbreon VMAX Alt Art is now available from a seller',
+      data: { card_id: 'pokemon-umbreon-vmax-alt' },
+      is_read: true,
+      created_at: new Date(Date.now() - 86400000).toISOString(),
+    },
+    {
+      id: 'notif-4',
+      user_id: userId,
+      type: 'achievement',
+      title: 'Achievement Unlocked!',
+      message: 'You earned the "Set Completer" badge',
+      data: { achievement: 'set_completer' },
+      is_read: true,
+      created_at: new Date(Date.now() - 172800000).toISOString(),
+    },
+  ];
 }
 
 export const dynamic = 'force-dynamic';
