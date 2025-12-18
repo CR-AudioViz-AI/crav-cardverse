@@ -3,6 +3,7 @@
 // Creates necessary tables for CravCards features
 // CravCards - CR AudioViz AI, LLC
 // Created: December 16, 2025
+// Fixed: December 17, 2025 - TypeScript .catch() error
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -26,32 +27,35 @@ export async function GET(request: NextRequest) {
     }, { status: 401 });
   }
 
-  const results: Record<string, any> = {};
+  const results: Record<string, string> = {};
 
   try {
     // Create wishlist table
     if (!action || action === 'wishlist' || action === 'all') {
-      const { error: wishlistError } = await supabase.rpc('exec_sql', {
-        sql: `
-          CREATE TABLE IF NOT EXISTS cv_wishlist (
-            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
-            card_id text,
-            card_name text NOT NULL,
-            category text,
-            set_name text,
-            image_url text,
-            target_price decimal(10,2),
-            priority text DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
-            notes text,
-            created_at timestamptz DEFAULT now(),
-            updated_at timestamptz DEFAULT now()
-          );
-          CREATE INDEX IF NOT EXISTS idx_cv_wishlist_user ON cv_wishlist(user_id);
-        `
-      }).catch(() => null);
-
-      results.wishlist = wishlistError ? 'error' : 'created or exists';
+      try {
+        const { error: wishlistError } = await supabase.rpc('exec_sql', {
+          sql: `
+            CREATE TABLE IF NOT EXISTS cv_wishlist (
+              id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+              user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+              card_id text,
+              card_name text NOT NULL,
+              category text,
+              set_name text,
+              image_url text,
+              target_price decimal(10,2),
+              priority text DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
+              notes text,
+              created_at timestamptz DEFAULT now(),
+              updated_at timestamptz DEFAULT now()
+            );
+            CREATE INDEX IF NOT EXISTS idx_cv_wishlist_user ON cv_wishlist(user_id);
+          `
+        });
+        results.wishlist = wishlistError ? `error: ${wishlistError.message}` : 'created or exists';
+      } catch {
+        results.wishlist = 'rpc not available';
+      }
     }
 
     // Add more trivia questions
@@ -172,10 +176,11 @@ export async function GET(request: NextRequest) {
       results,
       timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({
       success: false,
-      error: error.message,
+      error: message,
     }, { status: 500 });
   }
 }
