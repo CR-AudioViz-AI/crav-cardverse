@@ -261,39 +261,4 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Available classes
-export const FAB_CLASSES = [
-  'Generic',
-  'Brute',
-  'Guardian',
-  'Ninja',
-  'Warrior',
-  'Mechanologist',
-  'Ranger',
-  'Runeblade',
-  'Wizard',
-  'Illusionist',
-  'Elemental',
-  'Bard',
-  'Assassin',
-  'Merchant',
-  'Adjudicator',
-  'Necromancer',
-];
 
-// Available card types
-export const FAB_TYPES = [
-  'Action',
-  'Attack',
-  'Defense',
-  'Equipment',
-  'Hero',
-  'Instant',
-  'Weapon',
-  'Resource',
-  'Token',
-  'Mentor',
-];
-
-// Available pitch values
-export const FAB_PITCH_VALUES = ['1', '2', '3'];
