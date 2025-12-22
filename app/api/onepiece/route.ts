@@ -230,42 +230,4 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Available colors
-export const ONEPIECE_COLORS = [
-  'Red',
-  'Green',
-  'Blue',
-  'Purple',
-  'Black',
-  'Yellow',
-];
 
-// Available card types
-export const ONEPIECE_TYPES = [
-  'Leader',
-  'Character',
-  'Event',
-  'Stage',
-];
-
-// Available sets
-export const ONEPIECE_SETS = [
-  { id: 'OP01', name: 'Romance Dawn' },
-  { id: 'OP02', name: 'Paramount War' },
-  { id: 'OP03', name: 'Pillars of Strength' },
-  { id: 'OP04', name: 'Kingdoms of Intrigue' },
-  { id: 'OP05', name: 'Awakening of the New Era' },
-  { id: 'OP06', name: 'Wings of the Captain' },
-  { id: 'OP07', name: '500 Years in the Future' },
-  { id: 'OP08', name: 'Two Legends' },
-  { id: 'ST01', name: 'Straw Hat Crew' },
-  { id: 'ST02', name: 'Worst Generation' },
-  { id: 'ST03', name: 'The Seven Warlords of the Sea' },
-  { id: 'ST04', name: 'Animal Kingdom Pirates' },
-  { id: 'ST05', name: 'Film Edition' },
-  { id: 'ST06', name: 'Navy Absolute Justice' },
-  { id: 'ST07', name: 'Big Mom Pirates' },
-  { id: 'ST08', name: 'Monkey D. Luffy' },
-  { id: 'ST09', name: 'Yamato' },
-  { id: 'ST10', name: 'The Three Captains' },
-];
