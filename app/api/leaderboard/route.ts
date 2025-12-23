@@ -1,16 +1,23 @@
 // ============================================================================
 // LEADERBOARD API - User Rankings & Stats
 // CravCards - CR AudioViz AI, LLC
-// Created: December 22, 2025
+// Updated: December 22, 2025
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+function getSupabaseClient(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  
+  if (!url || !key) {
+    console.error('Supabase credentials missing');
+    return null;
+  }
+  
+  return createClient(url, key);
+}
 
 // XP required for each level
 function getXpForLevel(level: number): number {
@@ -19,10 +26,10 @@ function getXpForLevel(level: number): number {
 
 function getLevelFromXp(xp: number): number {
   let level = 1;
-  let requiredXp = 100;
-  while (xp >= requiredXp) {
+  let totalXp = 0;
+  while (totalXp + getXpForLevel(level) <= xp) {
+    totalXp += getXpForLevel(level);
     level++;
-    requiredXp += getXpForLevel(level);
   }
   return level;
 }
@@ -31,11 +38,19 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action') || 'global';
   const userId = searchParams.get('userId');
-  const timeframe = searchParams.get('timeframe') || 'all'; // 'day', 'week', 'month', 'all'
-  const category = searchParams.get('category'); // 'xp', 'cards', 'quests', 'streak'
+  const category = searchParams.get('category');
   const limit = parseInt(searchParams.get('limit') || '100');
 
   try {
+    const supabase = getSupabaseClient();
+    
+    if (!supabase) {
+      return NextResponse.json({
+        success: false,
+        error: 'Database connection not configured',
+      }, { status: 500 });
+    }
+
     // Get global leaderboard
     if (action === 'global') {
       let orderColumn = 'total_xp';
@@ -51,25 +66,22 @@ export async function GET(request: NextRequest) {
 
       if (error) throw error;
 
-      // Add rank and level info
       const leaderboard = (data || []).map((user, index) => ({
         rank: index + 1,
         ...user,
-        level: getLevelFromXp(user.total_xp),
-        nextLevelXp: getXpForLevel(getLevelFromXp(user.total_xp) + 1),
+        level: getLevelFromXp(user.total_xp || 0),
+        nextLevelXp: getXpForLevel(getLevelFromXp(user.total_xp || 0) + 1),
       }));
 
       return NextResponse.json({
         success: true,
         leaderboard,
         category: category || 'xp',
-        timeframe,
       });
     }
 
     // Get user's rank and stats
     if (action === 'user' && userId) {
-      // Get user stats
       const { data: userStats, error: userError } = await supabase
         .from('cv_user_stats')
         .select('*')
@@ -78,7 +90,6 @@ export async function GET(request: NextRequest) {
 
       if (userError && userError.code !== 'PGRST116') throw userError;
 
-      // If no stats exist, return default
       if (!userStats) {
         return NextResponse.json({
           success: true,
@@ -94,14 +105,13 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // Get user's rank
       const { count: higherXpCount } = await supabase
         .from('cv_user_stats')
         .select('id', { count: 'exact', head: true })
         .gt('total_xp', userStats.total_xp);
 
       const rank = (higherXpCount || 0) + 1;
-      const level = getLevelFromXp(userStats.total_xp);
+      const level = getLevelFromXp(userStats.total_xp || 0);
 
       return NextResponse.json({
         success: true,
@@ -116,7 +126,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get nearby users (users with similar rank)
+    // Get nearby users (similar rank)
     if (action === 'nearby' && userId) {
       const { data: userStats } = await supabase
         .from('cv_user_stats')
@@ -125,13 +135,9 @@ export async function GET(request: NextRequest) {
         .single();
 
       if (!userStats) {
-        return NextResponse.json({
-          success: true,
-          nearby: [],
-        });
+        return NextResponse.json({ success: true, nearby: [] });
       }
 
-      // Get 5 above and 5 below
       const { data: above } = await supabase
         .from('cv_user_stats')
         .select('*')
@@ -151,14 +157,12 @@ export async function GET(request: NextRequest) {
         .select('*')
         .eq('user_id', userId);
 
-      // Combine and sort
       const nearby = [
         ...(above || []).reverse(),
         ...(self || []),
         ...(below || []),
       ];
 
-      // Add ranks
       const { count: totalAbove } = await supabase
         .from('cv_user_stats')
         .select('id', { count: 'exact', head: true })
@@ -171,67 +175,13 @@ export async function GET(request: NextRequest) {
         nearby: nearby.map((user, index) => ({
           rank: startRank + index,
           ...user,
-          level: getLevelFromXp(user.total_xp),
+          level: getLevelFromXp(user.total_xp || 0),
           isCurrentUser: user.user_id === userId,
         })),
       });
     }
 
-    // Get top collectors by card type
-    if (action === 'by-category') {
-      const cardSource = searchParams.get('source');
-
-      // This would require a more complex query with card counting by source
-      // For now, return general leaderboard
-      const { data, error } = await supabase
-        .from('cv_user_stats')
-        .select('*')
-        .order('cards_collected', { ascending: false })
-        .limit(50);
-
-      if (error) throw error;
-
-      return NextResponse.json({
-        success: true,
-        leaderboard: data?.map((user, index) => ({
-          rank: index + 1,
-          ...user,
-        })),
-        category: cardSource || 'all',
-      });
-    }
-
-    // Get achievement leaders
-    if (action === 'achievements') {
-      const { data, error } = await supabase
-        .from('cv_user_achievements')
-        .select('user_id')
-        .order('earned_at', { ascending: false });
-
-      if (error) throw error;
-
-      // Count achievements per user
-      const achievementCounts: Record<string, number> = {};
-      (data || []).forEach(a => {
-        achievementCounts[a.user_id] = (achievementCounts[a.user_id] || 0) + 1;
-      });
-
-      const leaderboard = Object.entries(achievementCounts)
-        .map(([user_id, count]) => ({ user_id, achievement_count: count }))
-        .sort((a, b) => b.achievement_count - a.achievement_count)
-        .slice(0, limit)
-        .map((user, index) => ({ rank: index + 1, ...user }));
-
-      return NextResponse.json({
-        success: true,
-        leaderboard,
-      });
-    }
-
-    return NextResponse.json({
-      success: false,
-      error: 'Invalid action',
-    }, { status: 400 });
+    return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
 
   } catch (error) {
     console.error('Leaderboard API Error:', error);
@@ -247,6 +197,15 @@ export async function POST(request: NextRequest) {
   const action = searchParams.get('action');
 
   try {
+    const supabase = getSupabaseClient();
+    
+    if (!supabase) {
+      return NextResponse.json({
+        success: false,
+        error: 'Database connection not configured',
+      }, { status: 500 });
+    }
+
     const body = await request.json();
 
     // Initialize or update user stats
@@ -260,14 +219,12 @@ export async function POST(request: NextRequest) {
         }, { status: 400 });
       }
 
-      // Get current stats
       const { data: existing } = await supabase
         .from('cv_user_stats')
         .select('*')
         .eq('user_id', userId)
         .single();
 
-      // Calculate streak
       const lastActivity = existing?.last_activity_at ? new Date(existing.last_activity_at) : null;
       const now = new Date();
       const daysSinceLastActivity = lastActivity 
@@ -294,8 +251,7 @@ export async function POST(request: NextRequest) {
         trivia_played: (existing?.trivia_played || 0) + (trivia_played || 0),
         streak_days: newStreakDays,
         longest_streak: newLongestStreak,
-        last_activity_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        last_activity_at: now.toISOString(),
       };
 
       const { data, error } = await supabase
@@ -315,10 +271,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({
-      success: false,
-      error: 'Invalid action',
-    }, { status: 400 });
+    return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
 
   } catch (error) {
     console.error('Leaderboard API Error:', error);
