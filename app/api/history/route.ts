@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
         .from('cv_card_history')
         .select('*')
         .eq('id', id)
-        .eq('published', true)
+        .eq('is_published', true)
         .single();
 
       if (error) throw error;
@@ -65,8 +65,8 @@ export async function GET(request: NextRequest) {
       let query = supabase
         .from('cv_card_history')
         .select('*', { count: 'exact' })
-        .eq('published', true)
-        .order('date_relevance', { ascending: false, nullsFirst: false })
+        .eq('is_published', true)
+        .order('year_start', { ascending: false, nullsFirst: false })
         .range((page - 1) * limit, page * limit - 1);
 
       if (category) {
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
       }
 
       if (featured === 'true') {
-        query = query.eq('featured', true);
+        query = query.eq('is_featured', true);
       }
 
       const { data, error, count } = await query;
@@ -107,8 +107,7 @@ export async function GET(request: NextRequest) {
       const { data, error } = await supabase
         .from('cv_card_history')
         .select('*')
-        .eq('published', true)
-        .not('date_relevance', 'is', null);
+        .eq('is_published', true);
 
       if (error) throw error;
 
@@ -129,10 +128,9 @@ export async function GET(request: NextRequest) {
     if (action === 'timeline') {
       const { data, error } = await supabase
         .from('cv_card_history')
-        .select('id, title, summary, category, card_sources, date_relevance, era, image_url')
-        .eq('published', true)
-        .not('date_relevance', 'is', null)
-        .order('date_relevance', { ascending: true });
+        .select('id, title, summary, category, era, year_start')
+        .eq('is_published', true)
+        .order('year_start', { ascending: true });
 
       if (error) throw error;
 
@@ -162,7 +160,7 @@ export async function GET(request: NextRequest) {
       const { data, error } = await supabase
         .from('cv_card_history')
         .select('category')
-        .eq('published', true);
+        .eq('is_published', true);
 
       if (error) throw error;
 
@@ -197,7 +195,7 @@ export async function GET(request: NextRequest) {
       const { data, error } = await supabase
         .from('cv_card_history')
         .select('*')
-        .eq('published', true)
+        .eq('is_published', true)
         .or(`title.ilike.%${query}%,content.ilike.%${query}%,summary.ilike.%${query}%`)
         .order('view_count', { ascending: false })
         .limit(limit);
@@ -216,8 +214,8 @@ export async function GET(request: NextRequest) {
       const { data, error } = await supabase
         .from('cv_card_history')
         .select('*')
-        .eq('published', true)
-        .eq('featured', true)
+        .eq('is_published', true)
+        .eq('is_featured', true)
         .order('view_count', { ascending: false })
         .limit(10);
 
