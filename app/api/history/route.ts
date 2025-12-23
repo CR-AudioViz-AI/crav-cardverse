@@ -1,16 +1,23 @@
 // ============================================================================
 // CARD HISTORY / MUSEUM API - Historical Content & Stories
 // CravCards - CR AudioViz AI, LLC
-// Created: December 22, 2025
+// Updated: December 22, 2025
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+function getSupabaseClient(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  
+  if (!url || !key) {
+    console.error('Supabase credentials missing');
+    return null;
+  }
+  
+  return createClient(url, key);
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -24,6 +31,15 @@ export async function GET(request: NextRequest) {
   const page = parseInt(searchParams.get('page') || '1');
 
   try {
+    const supabase = getSupabaseClient();
+    
+    if (!supabase) {
+      return NextResponse.json({
+        success: false,
+        error: 'Database connection not configured',
+      }, { status: 500 });
+    }
+
     // Get specific history entry
     if (action === 'get' && id) {
       const { data, error } = await supabase
@@ -41,10 +57,7 @@ export async function GET(request: NextRequest) {
         .update({ view_count: (data.view_count || 0) + 1 })
         .eq('id', id);
 
-      return NextResponse.json({
-        success: true,
-        entry: data,
-      });
+      return NextResponse.json({ success: true, entry: data });
     }
 
     // List history entries
@@ -53,7 +66,7 @@ export async function GET(request: NextRequest) {
         .from('cv_card_history')
         .select('*', { count: 'exact' })
         .eq('published', true)
-        .order('date_relevance', { ascending: false })
+        .order('date_relevance', { ascending: false, nullsFirst: false })
         .range((page - 1) * limit, page * limit - 1);
 
       if (category) {
@@ -78,8 +91,8 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        entries: data,
-        totalCount: count,
+        entries: data || [],
+        totalCount: count || 0,
         page,
         pageSize: limit,
       });
@@ -88,23 +101,21 @@ export async function GET(request: NextRequest) {
     // Get today in history
     if (action === 'today') {
       const today = new Date();
-      const monthDay = `${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
+      const month = today.getMonth() + 1;
+      const day = today.getDate();
 
       const { data, error } = await supabase
         .from('cv_card_history')
         .select('*')
         .eq('published', true)
-        .not('date_relevance', 'is', null)
-        .order('date_relevance', { ascending: false });
+        .not('date_relevance', 'is', null);
 
       if (error) throw error;
 
-      // Filter entries that match today's month and day
       const todayEntries = (data || []).filter(entry => {
         if (!entry.date_relevance) return false;
         const entryDate = new Date(entry.date_relevance);
-        const entryMonthDay = `${(entryDate.getMonth() + 1).toString().padStart(2, '0')}-${entryDate.getDate().toString().padStart(2, '0')}`;
-        return entryMonthDay === monthDay;
+        return entryDate.getMonth() + 1 === month && entryDate.getDate() === day;
       });
 
       return NextResponse.json({
@@ -125,7 +136,6 @@ export async function GET(request: NextRequest) {
 
       if (error) throw error;
 
-      // Group by era
       const timeline = {
         early: [] as any[],
         classic: [] as any[],
@@ -134,9 +144,9 @@ export async function GET(request: NextRequest) {
       };
 
       (data || []).forEach(entry => {
-        const era = entry.era || 'current';
-        if (timeline[era as keyof typeof timeline]) {
-          timeline[era as keyof typeof timeline].push(entry);
+        const entryEra = entry.era || 'current';
+        if (timeline[entryEra as keyof typeof timeline]) {
+          timeline[entryEra as keyof typeof timeline].push(entry);
         }
       });
 
@@ -156,7 +166,6 @@ export async function GET(request: NextRequest) {
 
       if (error) throw error;
 
-      // Count by category
       const categoryCounts: Record<string, number> = {};
       (data || []).forEach(entry => {
         categoryCounts[entry.category] = (categoryCounts[entry.category] || 0) + 1;
@@ -198,7 +207,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         query,
-        entries: data,
+        entries: data || [],
       });
     }
 
@@ -214,16 +223,10 @@ export async function GET(request: NextRequest) {
 
       if (error) throw error;
 
-      return NextResponse.json({
-        success: true,
-        entries: data,
-      });
+      return NextResponse.json({ success: true, entries: data || [] });
     }
 
-    return NextResponse.json({
-      success: false,
-      error: 'Invalid action',
-    }, { status: 400 });
+    return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
 
   } catch (error) {
     console.error('History API Error:', error);
@@ -239,6 +242,15 @@ export async function POST(request: NextRequest) {
   const action = searchParams.get('action');
 
   try {
+    const supabase = getSupabaseClient();
+    
+    if (!supabase) {
+      return NextResponse.json({
+        success: false,
+        error: 'Database connection not configured',
+      }, { status: 500 });
+    }
+
     const body = await request.json();
 
     // Create new history entry (admin)
@@ -252,8 +264,6 @@ export async function POST(request: NextRequest) {
         date_relevance,
         era,
         image_url,
-        image_source,
-        image_license,
         source_url,
         source_name,
         tags,
@@ -278,8 +288,6 @@ export async function POST(request: NextRequest) {
           date_relevance,
           era: era || 'current',
           image_url,
-          image_source,
-          image_license,
           source_url,
           source_name,
           tags: tags || [],
@@ -291,10 +299,7 @@ export async function POST(request: NextRequest) {
 
       if (error) throw error;
 
-      return NextResponse.json({
-        success: true,
-        entry: data,
-      });
+      return NextResponse.json({ success: true, entry: data });
     }
 
     // Update history entry (admin)
@@ -310,26 +315,17 @@ export async function POST(request: NextRequest) {
 
       const { data, error } = await supabase
         .from('cv_card_history')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
+        .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
 
-      return NextResponse.json({
-        success: true,
-        entry: data,
-      });
+      return NextResponse.json({ success: true, entry: data });
     }
 
-    return NextResponse.json({
-      success: false,
-      error: 'Invalid action',
-    }, { status: 400 });
+    return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
 
   } catch (error) {
     console.error('History API Error:', error);
