@@ -95,58 +95,72 @@ export default function MarketplacePage() {
   const [sortBy, setSortBy] = useState('newest')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
-  // Fetch listings
+  // Fetch listings from API
   useEffect(() => {
     const fetchListings = async () => {
       setLoading(true)
       try {
-        let query = supabase
-          .from('marketplace_listings')
-          .select(`
-            *,
-            seller:profiles!seller_id(id, full_name, avatar_url)
-          `)
-          .eq('status', 'active')
+        // Build API URL with filters
+        const params = new URLSearchParams({
+          action: 'listings',
+          limit: '50',
+        })
         
-        // Apply filters
         if (category !== 'all') {
-          query = query.eq('category', category)
+          params.append('category', category)
         }
         
         if (searchQuery) {
-          query = query.ilike('title', `%${searchQuery}%`)
+          params.append('search', searchQuery)
         }
         
-        // Apply sorting
-        switch (sortBy) {
-          case 'price-low':
-            query = query.order('price', { ascending: true })
-            break
-          case 'price-high':
-            query = query.order('price', { ascending: false })
-            break
-          case 'popular':
-            query = query.order('views', { ascending: false })
-            break
-          default:
-            query = query.order('created_at', { ascending: false })
+        // Map sort options
+        const sortMap: Record<string, string> = {
+          'newest': 'recently_listed',
+          'price-low': 'price_low',
+          'price-high': 'price_high',
+          'popular': 'most_viewed',
         }
+        params.append('sort', sortMap[sortBy] || 'recently_listed')
         
-        const { data, error } = await query.limit(50)
+        const response = await fetch(`/api/marketplace?${params.toString()}`)
+        const data = await response.json()
         
-        if (error) throw error
+        if (!data.success) throw new Error(data.error || 'Failed to fetch listings')
         
-        setListings(data || [])
+        // Transform API data to match component expectations
+        const transformedListings = (data.listings || []).map((l: any) => ({
+          id: l.id,
+          title: l.card_name,
+          description: l.description || '',
+          category: l.card_source,
+          condition: l.condition,
+          price: l.price,
+          images: l.card_image ? [l.card_image] : [],
+          listing_type: 'sell',
+          status: l.status,
+          views: l.views || 0,
+          favorites: 0,
+          created_at: l.created_at,
+          seller: {
+            id: l.seller_id,
+            full_name: 'Seller',
+            avatar_url: '',
+          },
+        }))
         
-        // Calculate stats
-        if (data && data.length > 0) {
-          const totalValue = data.reduce((sum, l) => sum + (l.price || 0), 0)
-          const uniqueSellers = new Set(data.map(l => l.seller_id)).size
+        setListings(transformedListings)
+        
+        // Fetch stats separately
+        const statsResponse = await fetch('/api/marketplace?action=stats')
+        const statsData = await statsResponse.json()
+        
+        if (statsData.success && statsData.stats) {
           setStats({
-            totalListings: data.length,
-            totalVolume: totalValue,
-            activeSellers: uniqueSellers,
-            avgPrice: totalValue / data.length,
+            totalListings: statsData.stats.cardsListed || 0,
+            totalVolume: statsData.stats.totalValue || 0,
+            activeSellers: statsData.stats.activeSellers || 0,
+            avgPrice: statsData.stats.avgPrice || 0,
           })
         }
       } catch (error) {
@@ -158,7 +172,7 @@ export default function MarketplacePage() {
     }
     
     fetchListings()
-  }, [supabase, category, searchQuery, sortBy])
+  }, [category, searchQuery, sortBy])
 
   // Toggle favorite
   const toggleFavorite = async (listingId: string) => {
