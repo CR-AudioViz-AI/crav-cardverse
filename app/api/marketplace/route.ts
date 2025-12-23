@@ -143,15 +143,18 @@ export async function GET(request: NextRequest) {
             .select('seller_id', { count: 'exact', head: true })
             .eq('status', 'active');
 
-          return NextResponse.json({
-            success: true,
-            stats: {
-              cardsListed: listingsCount || 0,
-              totalValue: totalValue,
-              activeSellers: sellersCount || 0,
-              avgPrice: avgPrice,
-            },
-          });
+          if (listingsCount && listingsCount > 0) {
+            return NextResponse.json({
+              success: true,
+              stats: {
+                cardsListed: listingsCount || 0,
+                totalValue: totalValue,
+                activeSellers: sellersCount || 0,
+                avgPrice: avgPrice,
+              },
+            });
+          }
+          // If empty, fall through to sample data
         } catch {
           // Fall through to sample data
         }
@@ -209,7 +212,7 @@ export async function GET(request: NextRequest) {
 
           const { data, error, count } = await query;
 
-          if (!error && data) {
+          if (!error && data && data.length > 0) {
             return NextResponse.json({
               success: true,
               listings: data,
@@ -218,6 +221,7 @@ export async function GET(request: NextRequest) {
               pageSize: limit,
             });
           }
+          // If empty, fall through to sample data
         } catch {
           // Fall through to sample data
         }
