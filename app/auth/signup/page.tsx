@@ -94,12 +94,12 @@ export default function SignupPage() {
           .from('cv_profiles')
           .insert({
             id: authData.user.id,
+            user_id: authData.user.id,
             email: formData.email,
-            full_name: formData.name,
+            display_name: formData.name,
             avatar_url: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(formData.name)}`,
             level: 1,
             xp: 0,
-            member_since: new Date().toISOString(),
           })
 
         if (profileError) {
