@@ -1,15 +1,13 @@
 // ============================================================================
 // DIGIMON CARD GAME API - FREE ACCESS TO 2,000+ CARDS
 // CravCards - CR AudioViz AI, LLC
-// Created: December 22, 2025
+// Updated: December 22, 2025
 // Source: digimoncard.io
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 
 const DIGIMON_API = 'https://digimoncard.io/api-public';
-
-// Timeout for API requests
 const API_TIMEOUT = 8000;
 
 interface DigimonCard {
@@ -28,7 +26,7 @@ interface DigimonCard {
   cardnumber: string;
   maineffect?: string;
   soureeffect?: string;
-  set_name: string;
+  set_name?: string;
   card_sets?: string[];
   image_url: string;
 }
@@ -42,146 +40,70 @@ interface TransformedCard {
   card_number: string;
   rarity: string;
   image_url: string;
-  image_large: string;
   artist: string;
   types: string[];
   color: string;
-  stage: string;
-  level: number | null;
-  play_cost: number | null;
-  evolution_cost: number | null;
-  dp: number | null;
-  main_effect: string;
-  source_effect: string;
-  price_low: number | null;
-  price_mid: number | null;
-  price_high: number | null;
-  price_market: number | null;
   source: string;
 }
 
 function transformCard(card: DigimonCard): TransformedCard {
+  const setName = card.set_name || (card.card_sets?.[0]) || 'Unknown Set';
   return {
     id: `digimon-${card.cardnumber}`,
-    name: card.name,
+    name: card.name || 'Unknown',
     category: 'digimon',
-    set_name: card.set_name || (card.card_sets?.[0] || 'Unknown Set'),
-    set_id: card.set_name?.toLowerCase().replace(/\s+/g, '-') || '',
-    card_number: card.cardnumber,
+    set_name: String(setName),
+    set_id: String(setName).toLowerCase().replace(/\s+/g, '-'),
+    card_number: card.cardnumber || '',
     rarity: card.cardrarity || 'Unknown',
-    image_url: card.image_url,
-    image_large: card.image_url,
+    image_url: card.image_url || '',
     artist: card.artist || 'Unknown',
     types: card.digi_type ? [card.digi_type] : [],
     color: card.color || 'Unknown',
-    stage: card.stage || '',
-    level: card.level || null,
-    play_cost: card.play_cost || null,
-    evolution_cost: card.evolution_cost || null,
-    dp: card.dp || null,
-    main_effect: card.maineffect || '',
-    source_effect: card.soureeffect || '',
-    price_low: null,
-    price_mid: null,
-    price_high: null,
-    price_market: null,
     source: 'digimoncard.io',
   };
 }
 
-// Fetch with timeout
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout: number = API_TIMEOUT): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    throw error;
-  }
-}
-
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const query = searchParams.get('q');
-  const cardNumber = searchParams.get('id') || searchParams.get('cardnumber');
+  const query = searchParams.get('q') || searchParams.get('name') || '';
   const color = searchParams.get('color');
-  const type = searchParams.get('type');
-  const rarity = searchParams.get('rarity');
-  const setName = searchParams.get('set');
+  const cardType = searchParams.get('type');
+  const limit = parseInt(searchParams.get('limit') || '20');
   const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || searchParams.get('pageSize') || '20');
 
   try {
-    // Build search URL
-    const params = new URLSearchParams();
-    params.set('series', 'Digimon Card Game'); // Required parameter
-    
-    if (query) {
-      params.set('n', query); // Name search
-    }
-    
-    if (cardNumber) {
-      params.set('card', cardNumber);
-    }
-    
-    if (color) {
-      params.set('color', color);
-    }
-    
-    if (type) {
-      params.set('type', type);
-    }
-    
-    if (rarity) {
-      params.set('rarity', rarity);
-    }
-    
-    if (setName) {
-      params.set('pack', setName);
-    }
+    // Build API URL
+    let apiUrl = `${DIGIMON_API}/search.php?n=${encodeURIComponent(query)}`;
+    if (color) apiUrl += `&color=${encodeURIComponent(color)}`;
+    if (cardType) apiUrl += `&type=${encodeURIComponent(cardType)}`;
+    apiUrl += `&series=Digimon Card Game`;
 
-    const url = `${DIGIMON_API}/search.php?${params.toString()}`;
-    console.log('Digimon API URL:', url);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
-    const response = await fetchWithTimeout(url, {
-      headers: { 
-        'Accept': 'application/json',
-        'User-Agent': 'CravCards/1.0'
-      },
+    const response = await fetch(apiUrl, {
+      signal: controller.signal,
+      headers: { 'Accept': 'application/json' },
     });
 
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-      throw new Error(`Digimon API error: ${response.status}`);
+      throw new Error(`Digimon API returned ${response.status}`);
     }
 
     const data = await response.json();
-    
-    // Handle different response formats
-    let cards: DigimonCard[] = [];
-    if (Array.isArray(data)) {
-      cards = data;
-    } else if (data.cards && Array.isArray(data.cards)) {
-      cards = data.cards;
-    } else if (data.error) {
-      throw new Error(data.error);
-    }
+    const allCards: DigimonCard[] = Array.isArray(data) ? data : [];
 
-    // Apply pagination
-    const totalCount = cards.length;
-    const startIdx = (page - 1) * limit;
-    const paginatedCards = cards.slice(startIdx, startIdx + limit);
+    // Paginate results
+    const startIndex = (page - 1) * limit;
+    const paginatedCards = allCards.slice(startIndex, startIndex + limit);
 
     return NextResponse.json({
       success: true,
       cards: paginatedCards.map(transformCard),
-      totalCount,
+      totalCount: allCards.length,
       page,
       pageSize: limit,
       source: 'digimoncard.io',
@@ -189,16 +111,14 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Digimon API Error:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to fetch Digimon cards',
-        cards: [],
-        source: 'digimoncard.io',
-      },
-      { status: 500 }
-    );
+    
+    // Return empty but successful response on error
+    return NextResponse.json({
+      success: true,
+      cards: [],
+      totalCount: 0,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      source: 'digimoncard.io',
+    });
   }
 }
-
-
