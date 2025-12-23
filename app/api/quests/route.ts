@@ -1,31 +1,23 @@
 // ============================================================================
 // IMAGE QUESTS API - Gamified Card Image Collection
 // CravCards - CR AudioViz AI, LLC
-// Created: December 22, 2025
+// Updated: December 22, 2025
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-interface Quest {
-  id: string;
-  card_id: string;
-  card_name: string;
-  card_source: string;
-  set_name: string | null;
-  rarity: string;
-  quest_type: string;
-  reward_xp: number;
-  reward_credits: number;
-  bonus_multiplier: number;
-  status: string;
-  priority: number;
-  expires_at: string | null;
+// Initialize Supabase with fallbacks
+function getSupabaseClient(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  
+  if (!url || !key) {
+    console.error('Supabase credentials missing:', { url: !!url, key: !!key });
+    return null;
+  }
+  
+  return createClient(url, key);
 }
 
 export async function GET(request: NextRequest) {
@@ -38,6 +30,19 @@ export async function GET(request: NextRequest) {
   const page = parseInt(searchParams.get('page') || '1');
 
   try {
+    const supabase = getSupabaseClient();
+    
+    if (!supabase) {
+      return NextResponse.json({
+        success: false,
+        error: 'Database connection not configured',
+        debug: {
+          hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+          hasKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+        }
+      }, { status: 500 });
+    }
+
     // Get specific quest
     if (action === 'get' && questId) {
       const { data, error } = await supabase
@@ -48,9 +53,35 @@ export async function GET(request: NextRequest) {
 
       if (error) throw error;
 
+      return NextResponse.json({ success: true, quest: data });
+    }
+
+    // Get quest stats
+    if (action === 'stats') {
+      const { count: openCount } = await supabase
+        .from('cv_image_quests')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'open');
+
+      const { count: completedCount } = await supabase
+        .from('cv_image_quests')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'verified');
+
+      const { data: xpData } = await supabase
+        .from('cv_image_quests')
+        .select('reward_xp')
+        .eq('status', 'open');
+
+      const availableXp = xpData?.reduce((sum, q) => sum + (q.reward_xp || 0), 0) || 0;
+
       return NextResponse.json({
         success: true,
-        quest: data,
+        stats: {
+          openQuests: openCount || 0,
+          completedQuests: completedCount || 0,
+          availableXp,
+        },
       });
     }
 
@@ -74,14 +105,14 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        quests: data,
-        totalCount: count,
+        quests: data || [],
+        totalCount: count || 0,
         page,
         pageSize: limit,
       });
     }
 
-    // Get featured/high-priority quests
+    // Get featured quests
     if (action === 'featured') {
       const { data, error } = await supabase
         .from('cv_image_quests')
@@ -93,45 +124,10 @@ export async function GET(request: NextRequest) {
 
       if (error) throw error;
 
-      return NextResponse.json({
-        success: true,
-        quests: data,
-      });
+      return NextResponse.json({ success: true, quests: data || [] });
     }
 
-    // Get quest stats
-    if (action === 'stats') {
-      const { data: openCount } = await supabase
-        .from('cv_image_quests')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'open');
-
-      const { data: completedCount } = await supabase
-        .from('cv_image_quests')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'verified');
-
-      const { data: totalXp } = await supabase
-        .from('cv_image_quests')
-        .select('reward_xp')
-        .eq('status', 'open');
-
-      const availableXp = totalXp?.reduce((sum, q) => sum + (q.reward_xp || 0), 0) || 0;
-
-      return NextResponse.json({
-        success: true,
-        stats: {
-          openQuests: openCount || 0,
-          completedQuests: completedCount || 0,
-          availableXp,
-        },
-      });
-    }
-
-    return NextResponse.json({
-      success: false,
-      error: 'Invalid action',
-    }, { status: 400 });
+    return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
 
   } catch (error) {
     console.error('Quests API Error:', error);
@@ -147,6 +143,15 @@ export async function POST(request: NextRequest) {
   const action = searchParams.get('action');
 
   try {
+    const supabase = getSupabaseClient();
+    
+    if (!supabase) {
+      return NextResponse.json({
+        success: false,
+        error: 'Database connection not configured',
+      }, { status: 500 });
+    }
+
     const body = await request.json();
 
     // Claim a quest
@@ -160,7 +165,6 @@ export async function POST(request: NextRequest) {
         }, { status: 400 });
       }
 
-      // Check if quest is available
       const { data: quest, error: fetchError } = await supabase
         .from('cv_image_quests')
         .select('*')
@@ -175,14 +179,13 @@ export async function POST(request: NextRequest) {
         }, { status: 404 });
       }
 
-      // Claim the quest
       const { data, error } = await supabase
         .from('cv_image_quests')
         .update({
           status: 'claimed',
           claimed_by: userId,
           claimed_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         })
         .eq('id', questId)
         .eq('status', 'open')
@@ -195,73 +198,6 @@ export async function POST(request: NextRequest) {
         success: true,
         quest: data,
         message: 'Quest claimed! You have 24 hours to submit an image.',
-      });
-    }
-
-    // Submit image for quest
-    if (action === 'submit') {
-      const { questId, userId, imageUrl } = body;
-
-      if (!questId || !userId || !imageUrl) {
-        return NextResponse.json({
-          success: false,
-          error: 'Quest ID, User ID, and Image URL required',
-        }, { status: 400 });
-      }
-
-      // Verify user has claimed this quest
-      const { data: quest, error: fetchError } = await supabase
-        .from('cv_image_quests')
-        .select('*')
-        .eq('id', questId)
-        .eq('claimed_by', userId)
-        .eq('status', 'claimed')
-        .single();
-
-      if (fetchError || !quest) {
-        return NextResponse.json({
-          success: false,
-          error: 'Quest not found or not claimed by you',
-        }, { status: 404 });
-      }
-
-      // Create image record
-      const { data: image, error: imageError } = await supabase
-        .from('cv_card_images')
-        .insert({
-          card_id: quest.card_id,
-          card_source: quest.card_source,
-          card_name: quest.card_name,
-          image_url: imageUrl,
-          image_type: 'user_photo',
-          source: 'user',
-          license: 'user_submitted',
-          uploaded_by: userId,
-        })
-        .select()
-        .single();
-
-      if (imageError) throw imageError;
-
-      // Update quest status
-      const { data, error } = await supabase
-        .from('cv_image_quests')
-        .update({
-          status: 'submitted',
-          submitted_image_id: image.id,
-          submitted_at: new Date().toISOString(),
-        })
-        .eq('id', questId)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      return NextResponse.json({
-        success: true,
-        quest: data,
-        image,
-        message: 'Image submitted! Awaiting verification.',
       });
     }
 
@@ -286,105 +222,10 @@ export async function POST(request: NextRequest) {
 
       if (error) throw error;
 
-      return NextResponse.json({
-        success: true,
-        quest: data,
-      });
+      return NextResponse.json({ success: true, quest: data });
     }
 
-    // Verify quest (admin)
-    if (action === 'verify') {
-      const { questId, verifierId, approved, rejectionReason } = body;
-
-      if (!questId || !verifierId) {
-        return NextResponse.json({
-          success: false,
-          error: 'Quest ID and Verifier ID required',
-        }, { status: 400 });
-      }
-
-      const { data: quest, error: fetchError } = await supabase
-        .from('cv_image_quests')
-        .select('*, claimed_by')
-        .eq('id', questId)
-        .eq('status', 'submitted')
-        .single();
-
-      if (fetchError || !quest) {
-        return NextResponse.json({
-          success: false,
-          error: 'Quest not found or not submitted',
-        }, { status: 404 });
-      }
-
-      if (approved) {
-        // Approve the quest
-        const { data, error } = await supabase
-          .from('cv_image_quests')
-          .update({
-            status: 'verified',
-            verified_by: verifierId,
-            verified_at: new Date().toISOString(),
-          })
-          .eq('id', questId)
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        // Update user stats
-        await supabase.rpc('increment_user_stats', {
-          p_user_id: quest.claimed_by,
-          p_xp: quest.reward_xp,
-          p_quests: 1,
-          p_images: 1,
-        });
-
-        // Mark image as verified
-        if (quest.submitted_image_id) {
-          await supabase
-            .from('cv_card_images')
-            .update({
-              verified: true,
-              verified_by: verifierId,
-              verified_at: new Date().toISOString(),
-            })
-            .eq('id', quest.submitted_image_id);
-        }
-
-        return NextResponse.json({
-          success: true,
-          quest: data,
-          message: 'Quest verified! User awarded XP and credits.',
-        });
-      } else {
-        // Reject the quest
-        const { data, error } = await supabase
-          .from('cv_image_quests')
-          .update({
-            status: 'rejected',
-            rejection_reason: rejectionReason || 'Image did not meet quality standards',
-            verified_by: verifierId,
-            verified_at: new Date().toISOString(),
-          })
-          .eq('id', questId)
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        return NextResponse.json({
-          success: true,
-          quest: data,
-          message: 'Quest rejected.',
-        });
-      }
-    }
-
-    return NextResponse.json({
-      success: false,
-      error: 'Invalid action',
-    }, { status: 400 });
+    return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
 
   } catch (error) {
     console.error('Quests API Error:', error);
